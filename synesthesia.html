@@ -565,8 +565,7 @@
   </div>
 </div>
 
-<!-- No external ML dependencies needed — Claude API handles inference -->
-<script>
+<script type="module">
 // ─── INSTRUMENT DEFINITIONS ───────────────────────────────────────────────
 const INSTRUMENTS = [
   { id: 'trumpet',  name: 'Trumpet',       color: '#FFE600', freqLow: 165,  freqHigh: 988,   shape: 'blob',    size: 'medium' },
@@ -748,13 +747,13 @@ function updateStatusDot() {
   dot.className = 'status-dot ' + (isPlaying && !isPaused ? 'playing' : isPaused ? 'paused' : '');
 }
 
-// ─── CLAUDE API INSTRUMENT INFERENCE (pre-analysed at load time) ─────────
-// When a file loads we offline-render it, extract features for every 4s
-// chunk, fire all Claude requests (concurrency-limited), and cache results.
-// During playback we just look up the current chunk — zero waiting.
+// ─── ML-BASED INSTRUMENT CLASSIFICATION (AST via Transformers.js) ────────
+// On file load: resample to 16kHz, chunk the audio, classify each chunk
+// with the Audio Spectrogram Transformer pretrained on AudioSet (527 classes).
+// During playback we look up the cached ML results — zero waiting.
 
 const CHUNK_SEC = 4;
-let songInferences = [];     // Array of {trumpet, saxophone, …} per chunk
+let songInferences = [];
 let inferenceReady = false;
 let inferenceTotal = 0;
 let inferenceDone = 0;
@@ -764,253 +763,151 @@ function setModelStatus(msg) {
   if (el) el.textContent = msg;
 }
 
-setModelStatus('Not in use: using spectral analysis.');
+// ─── AudioSet class name → our instrument ID mapping ─────────────────────
+const AUDIOSET_INSTRUMENT_MAP = {
+  trumpet:   ['Trumpet', 'Brass instrument', 'French horn', 'Trombone'],
+  saxophone: ['Saxophone'],
+  violin:    ['Violin, fiddle', 'Bowed string instrument'],
+  viola:     ['Cello'],
+  bass:      ['Double bass', 'Bass guitar', 'Bass drum'],
+  flute:     ['Flute'],
+  guitar:    ['Guitar', 'Acoustic guitar', 'Electric guitar', 'Steel guitar, slide guitar', 'Strum'],
+  voice_hi:  ['Singing', 'Female singing, woman singing', 'Child singing', 'Choir'],
+  voice_lo:  ['Male singing, man singing'],
+  piano:     ['Piano', 'Electric piano', 'Keyboard (musical)'],
+};
 
-// Extract spectral features from a Float32Array chunk at the audio sample rate
-function extractFeaturesFromPCM(pcm, sampleRate) {
-  const fftSize = 4096;
-  // Build a power spectrum via a simple DFT approximation using the FFT size
-  // We use an offline approach: compute the magnitude spectrum by averaging frames
-  const hopSize = fftSize;
-  const numFrames = Math.floor(pcm.length / hopSize);
-  if (numFrames === 0) return null;
+// ─── ML model loading ────────────────────────────────────────────────────
+let mlClassifier = null;
 
-  // Accumulate averaged spectrum
-  const spectrum = new Float32Array(fftSize / 2);
-  for (let f = 0; f < numFrames; f++) {
-    // Apply Hann window and compute FFT magnitudes via autocorrelation-based approach
-    // For simplicity we use a real FFT approximation with the Web Audio AnalyserNode
-    // but since we're offline we just compute the magnitude spectrum directly
-    const frame = pcm.slice(f * hopSize, f * hopSize + fftSize);
-    // Apply Hann window
-    for (let i = 0; i < frame.length; i++) {
-      frame[i] *= 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
-    }
-    // Naive DFT magnitude for each bin (fast enough for 2048 bins offline)
-    for (let k = 0; k < fftSize / 2; k++) {
-      let re = 0, im = 0;
-      // Subsample: only compute every 4th frequency for speed
-      if (k % 4 !== 0) continue;
-      for (let n = 0; n < fftSize; n++) {
-        const angle = 2 * Math.PI * k * n / fftSize;
-        re += (frame[n] || 0) * Math.cos(angle);
-        im -= (frame[n] || 0) * Math.sin(angle);
-      }
-      spectrum[k] += Math.sqrt(re * re + im * im) / fftSize;
-    }
-  }
-  // Average and normalise to 0-255 scale to match live analyser output
-  const maxVal = Math.max(...spectrum) || 1;
-  const normSpectrum = new Uint8Array(fftSize / 2);
-  for (let i = 0; i < fftSize / 2; i++) {
-    normSpectrum[i] = Math.min(255, Math.round((spectrum[i] / numFrames / maxVal) * 255));
-  }
-  return computeFeatureVector(normSpectrum, sampleRate);
-}
+setModelStatus('Downloading ML runtime…');
 
-// Use OfflineAudioContext to get a proper FFT spectrum for a PCM chunk
-async function extractFeaturesOffline(pcm, sampleRate) {
-  const fftSize = 4096;
-  const duration = pcm.length / sampleRate;
+async function initML() {
   try {
-    const offCtx = new OfflineAudioContext(1, pcm.length, sampleRate);
-    const buf = offCtx.createBuffer(1, pcm.length, sampleRate);
-    buf.copyToChannel(pcm, 0);
+    setModelStatus('Downloading ML runtime…');
+    const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+    env.allowLocalModels = false;
 
-    // Use a script processor to grab FFT data mid-render
-    const src = offCtx.createBufferSource();
-    src.buffer = buf;
-
-    const analyserNode = offCtx.createAnalyser();
-    analyserNode.fftSize = fftSize;
-    analyserNode.smoothingTimeConstant = 0.5;
-
-    src.connect(analyserNode);
-    analyserNode.connect(offCtx.destination);
-    src.start(0);
-
-    await offCtx.startRendering();
-
-    // OfflineAudioContext analyser doesn't give live data after render
-    // so we fall back to the manual feature extraction
-    throw new Error('use manual');
-  } catch(e) {
-    // Manual feature extraction path
-    return extractFeaturesManual(pcm, sampleRate);
+    setModelStatus('Loading AST model (first load downloads ~87 MB)…');
+    mlClassifier = await pipeline(
+      'audio-classification',
+      'Xenova/ast-finetuned-audioset-10-10-0.4593',
+      {
+        progress_callback: (data) => {
+          if (data.status === 'progress' && data.progress) {
+            setModelStatus(`Loading model: ${Math.round(data.progress)}%`);
+          }
+        }
+      }
+    );
+    setModelStatus('ML model ready');
+  } catch (err) {
+    console.error('ML model failed to load:', err);
+    setModelStatus('Model load failed — see console');
   }
 }
 
-function extractFeaturesManual(pcm, sampleRate) {
-  // Compute RMS
-  let rmsSum = 0;
-  for (let i = 0; i < pcm.length; i++) rmsSum += pcm[i] * pcm[i];
-  const rms = Math.sqrt(rmsSum / pcm.length);
+// Start loading immediately in the background
+initML();
 
-  // Build approximate magnitude spectrum using overlapping short DFTs
-  const fftSize = 512; // smaller for speed
-  const hopSize = 256;
-  const numFrames = Math.floor((pcm.length - fftSize) / hopSize);
-  const spectrum = new Float32Array(fftSize / 2).fill(0);
+// ─── Audio resampling to 16 kHz mono ─────────────────────────────────────
+async function resampleTo16k(audioBuf) {
+  const targetRate = 16000;
+  const numSamples = Math.ceil(audioBuf.duration * targetRate);
+  const offCtx = new OfflineAudioContext(1, numSamples, targetRate);
+  const src = offCtx.createBufferSource();
+  src.buffer = audioBuf;
+  src.connect(offCtx.destination);
+  src.start(0);
+  const rendered = await offCtx.startRendering();
+  return rendered.getChannelData(0);
+}
 
-  for (let f = 0; f < Math.min(numFrames, 64); f++) { // cap at 64 frames
-    const offset = f * hopSize;
-    let re, im;
-    for (let k = 0; k < fftSize / 2; k += 2) { // stride 2 for speed
-      re = 0; im = 0;
-      for (let n = 0; n < fftSize; n++) {
-        const s = (pcm[offset + n] || 0) * (0.5 - 0.5 * Math.cos(2 * Math.PI * n / fftSize));
-        const angle = 2 * Math.PI * k * n / fftSize;
-        re += s * Math.cos(angle);
-        im -= s * Math.sin(angle);
+// ─── Classify a single PCM chunk (16 kHz Float32Array) ───────────────────
+async function classifyChunkML(pcm16k) {
+  const results = await mlClassifier(pcm16k, { topk: 30 });
+
+  const scores = {};
+  INSTRUMENTS.forEach(inst => scores[inst.id] = 0);
+
+  for (const { label, score } of results) {
+    const lowerLabel = label.toLowerCase();
+    for (const [instId, targets] of Object.entries(AUDIOSET_INSTRUMENT_MAP)) {
+      for (const t of targets) {
+        if (lowerLabel === t.toLowerCase() ||
+            lowerLabel.includes(t.toLowerCase()) ||
+            t.toLowerCase().includes(lowerLabel)) {
+          scores[instId] = Math.max(scores[instId], score);
+        }
       }
-      spectrum[k] += Math.sqrt(re * re + im * im);
     }
   }
 
-  // Normalise to 0-255
-  const maxVal = Math.max(...Array.from(spectrum)) || 1;
-  const norm = new Uint8Array(fftSize / 2);
-  for (let i = 0; i < fftSize / 2; i++) {
-    norm[i] = Math.min(255, Math.round(spectrum[i] / maxVal * 255));
-  }
-
-  return computeFeatureVector(norm, sampleRate, rms);
+  return scores;
 }
 
-function computeFeatureVector(freqData, sampleRate, rmsOverride) {
-  const getBand = (lo, hi) => getFreqBandEnergy(freqData, sampleRate, lo, hi);
-  const subBass = getBand(20, 80);
-  const bass    = getBand(80, 250);
-  const lowMid  = getBand(250, 500);
-  const mid     = getBand(500, 2000);
-  const highMid = getBand(2000, 4000);
-  const high    = getBand(4000, 8000);
-  const air     = getBand(8000, 20000);
-
-  let maxVal = 0, maxIdx = 1;
-  const limit = Math.floor(freqData.length * 0.25);
-  for (let i = 2; i < limit; i++) {
-    if (freqData[i] > maxVal) { maxVal = freqData[i]; maxIdx = i; }
-  }
-  const nyq = sampleRate / 2;
-  const dominantHz = Math.round(maxIdx * nyq / freqData.length);
-  const harmonicRatio = computeHarmonicRatio(freqData, maxIdx);
-  const oddEven = computeOddEvenRatio(freqData, maxIdx);
-  const centroidHz = getSpectralCentroid(freqData, sampleRate);
-  const mfccs = computeMFCCs(freqData, sampleRate);
-  const rms = rmsOverride !== undefined ? rmsOverride : (subBass + bass + lowMid + mid + highMid + high + air) / 7;
-
-  return { rms, dominantHz, centroidHz, flux: 0, harmonicRatio, oddEven,
-           subBass, bass, lowMid, mid, highMid, high, air, mfccs };
-}
-
-async function runClaudeInference(features, chunkIndex) {
-  const prompt = `You are an expert music information retrieval system specialising in instrument identification from audio spectral features.
-
-Given these spectral features extracted from a ${CHUNK_SEC}s audio chunk (chunk ${chunkIndex + 1}):
-- RMS energy: ${features.rms.toFixed(4)}
-- Dominant pitch: ${features.dominantHz} Hz
-- Spectral centroid: ${features.centroidHz} Hz
-- Harmonic ratio: ${features.harmonicRatio.toFixed(3)}
-- Odd/even harmonic ratio: ${features.oddEven.toFixed(3)}
-- Sub-bass (20-80Hz): ${features.subBass.toFixed(3)}
-- Bass (80-250Hz): ${features.bass.toFixed(3)}
-- Low-mid (250-500Hz): ${features.lowMid.toFixed(3)}
-- Mid (500-2kHz): ${features.mid.toFixed(3)}
-- High-mid (2-4kHz): ${features.highMid.toFixed(3)}
-- High (4-8kHz): ${features.high.toFixed(3)}
-- Air (8-20kHz): ${features.air.toFixed(3)}
-- MFCC[1-5]: ${features.mfccs.slice(0,5).map(v=>v.toFixed(2)).join(', ')}
-
-Estimate presence probability (0.0–1.0) for each instrument using these signatures:
-- Trumpet: bright buzz, odd harmonics dominant, centroid 1-4kHz, fundamental 165-988Hz
-- Saxophone: warm reedy, mid-heavy, centroid 800-2kHz, moderate harmonic ratio
-- Violin/Viola: smooth bowed, rich harmonics 200-3kHz, low transients
-- Bass: dominant sub-bass+bass, fundamental <300Hz, few upper partials
-- Flute: near-pure tone, high harmonic ratio, high-mid dominant
-- Guitar: plucked transients, mid body 80-1200Hz
-- Voice (high): formants 1-3kHz, fundamental 200-1050Hz
-- Voice (low): fundamental 80-400Hz, deep resonance
-- Piano: wide range, percussive attack, tonal decay
-
-Respond ONLY with a JSON object, no markdown:
-{"trumpet":0.0,"saxophone":0.0,"violin":0.0,"viola":0.0,"bass":0.0,"flute":0.0,"guitar":0.0,"voice_hi":0.0,"voice_lo":0.0,"piano":0.0}`;
-
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 120,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  const data = await resp.json();
-  const text = data.content?.[0]?.text?.trim() || '{}';
-  const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-  Object.keys(parsed).forEach(k => {
-    parsed[k] = Math.max(0, Math.min(1, parseFloat(parsed[k]) || 0));
-  });
-  return parsed;
-}
-
-// Pre-analyse the entire song when a file loads
+// ─── Pre-analyse the entire song on upload ───────────────────────────────
 async function preAnalyseSong(audioBuf) {
-  const sampleRate = audioBuf.sampleRate;
-  const chunkSamples = CHUNK_SEC * sampleRate;
-  const totalChunks = Math.ceil(audioBuf.duration / CHUNK_SEC);
+  // Wait for model if it's still loading
+  if (!mlClassifier) {
+    setModelStatus('Waiting for ML model to finish loading…');
+    while (!mlClassifier) {
+      await new Promise(r => setTimeout(r, 500));
+      if (document.getElementById('modelStatus').textContent.includes('failed')) return;
+    }
+  }
+
+  setModelStatus('Resampling audio to 16 kHz…');
+  const pcm16k = await resampleTo16k(audioBuf);
+
+  const chunkSamples = CHUNK_SEC * 16000;
+  const totalChunks = Math.ceil(pcm16k.length / chunkSamples);
 
   songInferences = new Array(totalChunks).fill(null);
   inferenceReady = false;
   inferenceTotal = totalChunks;
   inferenceDone = 0;
 
-  setModelStatus(`⟳ Pre-analysing 0/${totalChunks} chunks…`);
+  setModelStatus(`Classifying: 0/${totalChunks} chunks…`);
   document.getElementById('playBtn').disabled = true;
 
-  // Extract mono PCM for the whole buffer
-  const channelData = audioBuf.getChannelData(0);
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * chunkSamples;
+    const end = Math.min(start + chunkSamples, pcm16k.length);
+    const chunk = pcm16k.slice(start, end);
 
-  // Process chunks with concurrency limit of 3
-  const CONCURRENCY = 3;
-  let nextChunk = 0;
+    // Check if chunk is silent
+    let rms = 0;
+    for (let j = 0; j < chunk.length; j++) rms += chunk[j] * chunk[j];
+    rms = Math.sqrt(rms / chunk.length);
 
-  async function worker() {
-    while (nextChunk < totalChunks) {
-      const i = nextChunk++;
-      const start = i * chunkSamples;
-      const end = Math.min(start + chunkSamples, channelData.length);
-      const pcm = channelData.slice(start, end);
-
+    if (rms < 0.001) {
+      const silent = {};
+      INSTRUMENTS.forEach(inst => silent[inst.id] = 0);
+      songInferences[i] = silent;
+    } else {
       try {
-        const features = extractFeaturesManual(pcm, sampleRate);
-        if (features.rms < 0.001) {
-          // Silent chunk — skip Claude, use zeros
-          songInferences[i] = { trumpet:0, saxophone:0, violin:0, viola:0,
-                                 bass:0, flute:0, guitar:0, voice_hi:0, voice_lo:0, piano:0 };
-        } else {
-          songInferences[i] = await runClaudeInference(features, i);
-        }
-      } catch(e) {
-        songInferences[i] = null; // will fall back to spectral
+        songInferences[i] = await classifyChunkML(chunk);
+      } catch (e) {
+        console.warn(`Chunk ${i} classification failed:`, e);
+        const fallback = {};
+        INSTRUMENTS.forEach(inst => fallback[inst.id] = 0);
+        songInferences[i] = fallback;
       }
+    }
 
-      inferenceDone++;
-      const pct = Math.round(inferenceDone / totalChunks * 100);
-      setModelStatus(`⟳ Pre-analysing ${inferenceDone}/${totalChunks} (${pct}%)…`);
-      // Update play button once first chunk is done so user can start early
-      if (inferenceDone === 1) {
-        document.getElementById('playBtn').disabled = false;
-      }
+    inferenceDone++;
+    const pct = Math.round(inferenceDone / totalChunks * 100);
+    setModelStatus(`Classifying: ${inferenceDone}/${totalChunks} (${pct}%)…`);
+
+    if (inferenceDone === 1) {
+      document.getElementById('playBtn').disabled = false;
     }
   }
 
-  // Launch concurrent workers
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, totalChunks) }, worker));
-
   inferenceReady = true;
   document.getElementById('playBtn').disabled = false;
-  setModelStatus(`✓ Pre-analysis complete (${totalChunks} chunks)`);
+  setModelStatus(`ML analysis complete (${totalChunks} chunks)`);
 }
 
 // Look up the cached inference for the current playback position
@@ -1020,270 +917,33 @@ function getCachedInference(elapsedSec) {
   return songInferences[idx] || null;
 }
 
+// ─── INSTRUMENT DETECTION (ML lookup + temporal smoothing) ───────────────
+let spectralHistory = [];
 
-// ─── ENHANCED SPECTRAL ANALYSIS (primary engine, Claude blended in) ──────
-// Uses MFCCs, spectral contrast, harmonic-to-noise ratio, and sub-band
-// energy profiles that are instrument-specific:
-//   - Brass (trumpet/saxophone): strong odd harmonics, buzzy timbre
-//   - Strings: smooth spectral envelope, rich in mid harmonics
-//   - Flute: near-pure tone, very low noise floor, high fundamental
-//   - Bass: dominant sub-bass, few upper partials
-//   - Percussion/transients: high spectral flux
-
-function getFreqBandEnergy(freqData, sampleRate, lowHz, highHz) {
-  const nyq = sampleRate / 2;
-  const len = freqData.length;
-  const low = Math.max(0, Math.floor(lowHz / nyq * len));
-  const high = Math.min(len - 1, Math.ceil(highHz / nyq * len));
-  let sum = 0, count = 0;
-  for (let i = low; i <= high; i++) { sum += freqData[i]; count++; }
-  return count > 0 ? sum / count / 255 : 0; // normalized 0-1
-}
-
-function computeMFCCs(freqData, sampleRate, numCoeffs = 13) {
-  // Simplified mel-filterbank → DCT
-  const numFilters = 26;
-  const melMin = 0, melMax = 2595 * Math.log10(1 + sampleRate / 2 / 700);
-  const melPoints = Array.from({length: numFilters + 2}, (_, i) =>
-    melMin + i * (melMax - melMin) / (numFilters + 1));
-  const hzPoints = melPoints.map(m => 700 * (Math.pow(10, m / 2595) - 1));
-  const binPoints = hzPoints.map(hz => Math.floor((hz / (sampleRate / 2)) * freqData.length));
-
-  const filterBank = [];
-  for (let m = 1; m <= numFilters; m++) {
-    let energy = 0;
-    for (let k = binPoints[m-1]; k <= binPoints[m+1]; k++) {
-      if (k < 0 || k >= freqData.length) continue;
-      const norm = freqData[k] / 255;
-      if (k < binPoints[m]) energy += norm * (k - binPoints[m-1]) / (binPoints[m] - binPoints[m-1] + 1e-9);
-      else energy += norm * (binPoints[m+1] - k) / (binPoints[m+1] - binPoints[m] + 1e-9);
-    }
-    filterBank.push(Math.log(energy + 1e-9));
-  }
-
-  const mfccs = [];
-  for (let n = 1; n <= numCoeffs; n++) {
-    let sum = 0;
-    for (let m = 0; m < numFilters; m++) {
-      sum += filterBank[m] * Math.cos(Math.PI * n * (m + 0.5) / numFilters);
-    }
-    mfccs.push(sum);
-  }
-  return mfccs;
-}
-
-function computeSpectralFlux(freqData, prevFreqData) {
-  if (!prevFreqData) return 0;
-  let flux = 0;
-  for (let i = 0; i < freqData.length; i++) {
-    const diff = (freqData[i] - prevFreqData[i]) / 255;
-    flux += diff > 0 ? diff * diff : 0; // half-wave rectified
-  }
-  return Math.sqrt(flux / freqData.length);
-}
-
-function computeHarmonicRatio(freqData, fundamentalBin) {
-  // Ratio of energy at harmonics vs. total energy in range
-  if (fundamentalBin < 2) return 0;
-  const range = Math.min(freqData.length, fundamentalBin * 8);
-  let harmonicEnergy = 0, totalEnergy = 0;
-  for (let i = 0; i < range; i++) {
-    totalEnergy += freqData[i];
-    // Check if this bin is near a harmonic (within 2 bins)
-    for (let h = 1; h <= 8; h++) {
-      if (Math.abs(i - fundamentalBin * h) <= 2) {
-        harmonicEnergy += freqData[i];
-        break;
-      }
-    }
-  }
-  return totalEnergy > 0 ? harmonicEnergy / totalEnergy : 0;
-}
-
-function computeOddEvenRatio(freqData, fundamentalBin) {
-  // Odd/even harmonic ratio — brass instruments have stronger odd harmonics
-  let odd = 0, even = 0;
-  for (let h = 1; h <= 8; h++) {
-    const bin = Math.round(fundamentalBin * h);
-    if (bin >= freqData.length) break;
-    const e = freqData[bin] + (freqData[bin-1]||0) + (freqData[bin+1]||0);
-    if (h % 2 === 1) odd += e; else even += e;
-  }
-  return (odd + even) > 0 ? odd / (odd + even) : 0.5;
-}
-
-let prevFreqData = null;
-let spectralHistory = []; // rolling window for smoothing
-let lastClaudeResult = {}; // current chunk's cached inference
-
-function detectInstrumentsSpectral(freqData, sampleRate) {
+function detectInstruments() {
   const result = {};
+  INSTRUMENTS.forEach(inst => result[inst.id] = 0);
 
-  // Look up cached Claude inference for the current playback position
   if (isPlaying && audioCtx) {
     const elapsed = audioCtx.currentTime - startTime;
     const cached = getCachedInference(elapsed);
-    if (cached) lastClaudeResult = cached;
+    if (cached) Object.assign(result, cached);
   }
 
-  // --- Core spectral features ---
-  const rmsNorm = getFreqBandEnergy(freqData, sampleRate, 20, 20000);
-  const subBass   = getFreqBandEnergy(freqData, sampleRate, 20,   80);
-  const bass      = getFreqBandEnergy(freqData, sampleRate, 80,   250);
-  const lowMid    = getFreqBandEnergy(freqData, sampleRate, 250,  500);
-  const mid       = getFreqBandEnergy(freqData, sampleRate, 500,  2000);
-  const highMid   = getFreqBandEnergy(freqData, sampleRate, 2000, 4000);
-  const high      = getFreqBandEnergy(freqData, sampleRate, 4000, 8000);
-  const air       = getFreqBandEnergy(freqData, sampleRate, 8000, 20000);
-
-  // Find dominant fundamental
-  let maxVal = 0, maxIdx = 1;
-  for (let i = 2; i < freqData.length * 0.25; i++) {
-    if (freqData[i] > maxVal) { maxVal = freqData[i]; maxIdx = i; }
-  }
-  const nyq = sampleRate / 2;
-  const fundamentalHz = maxIdx * nyq / freqData.length;
-  const harmonicRatio = computeHarmonicRatio(freqData, maxIdx);
-  const oddEven = computeOddEvenRatio(freqData, maxIdx);
-  const flux = computeSpectralFlux(freqData, prevFreqData);
-  const mfccs = computeMFCCs(freqData, sampleRate);
-
-  // --- Instrument scores using multi-feature fingerprints ---
-
-  // TRUMPET: brass buzz, 165-988Hz fundamental, strong odd harmonics, bright
-  result['trumpet'] = clamp(
-    (mid * 0.4) +
-    (highMid * 0.3) +
-    (oddEven > 0.6 ? 0.3 : 0) +
-    (fundamentalHz > 165 && fundamentalHz < 1000 ? 0.2 : 0) +
-    (harmonicRatio > 0.4 ? 0.15 : 0) -
-    (subBass * 0.5) -
-    (air * 0.3)
-  );
-
-  // SAXOPHONE: warm mid-heavy tone, less bright than trumpet, reedy timbre
-  result['saxophone'] = clamp(
-    (mid * 0.5) +
-    (lowMid * 0.3) +
-    (fundamentalHz > 80 && fundamentalHz < 1050 ? 0.2 : 0) +
-    (harmonicRatio > 0.3 ? 0.1 : 0) -
-    (air * 0.4) -
-    (subBass * 0.4)
-  );
-
-  // VIOLIN: prominent in 200-3000Hz, smooth envelope, high harmonic content
-  result['violin'] = clamp(
-    (mid * 0.35) +
-    (highMid * 0.25) +
-    (high * 0.1) +
-    (harmonicRatio > 0.35 ? 0.15 : 0) +
-    (fundamentalHz > 190 && fundamentalHz < 3200 ? 0.15 : 0) -
-    (subBass * 0.5)
-  );
-
-  // VIOLA: similar to violin but lower, darker
-  result['viola'] = clamp(
-    (lowMid * 0.4) +
-    (mid * 0.3) +
-    (harmonicRatio > 0.3 ? 0.1 : 0) +
-    (fundamentalHz > 125 && fundamentalHz < 1400 ? 0.15 : 0) -
-    (high * 0.3) -
-    (subBass * 0.4)
-  );
-
-  // BASS: strong sub & bass bands, fundamental below 300Hz
-  result['bass'] = clamp(
-    (subBass * 0.5) +
-    (bass * 0.4) +
-    (fundamentalHz < 300 ? 0.2 : -0.2) +
-    (harmonicRatio > 0.3 ? 0.1 : 0) -
-    (high * 0.4) -
-    (air * 0.5)
-  );
-
-  // FLUTE: near-pure tone, high fundamental, very low noise, prominent in 262-4186Hz
-  const toneClarity = harmonicRatio > 0.5 ? harmonicRatio : 0;
-  result['flute'] = clamp(
-    (highMid * 0.35) +
-    (high * 0.2) +
-    (toneClarity * 0.25) +
-    (fundamentalHz > 250 && fundamentalHz < 4200 ? 0.2 : 0) +
-    (oddEven < 0.6 ? 0.1 : -0.1) -
-    (subBass * 0.6) -
-    (bass * 0.3)
-  );
-
-  // GUITAR: plucked transients + mid body, spectral flux from picks
-  result['guitar'] = clamp(
-    (mid * 0.3) +
-    (lowMid * 0.25) +
-    (flux * 0.4) +
-    (fundamentalHz > 80 && fundamentalHz < 1200 ? 0.15 : 0) -
-    (subBass * 0.3)
-  );
-
-  // VOICE HIGH: 200-1000Hz fundamental, formants in 1-3kHz, breathiness
-  result['voice_hi'] = clamp(
-    (mid * 0.4) +
-    (lowMid * 0.2) +
-    (air * 0.1) +
-    (fundamentalHz > 200 && fundamentalHz < 1050 ? 0.2 : 0) +
-    (harmonicRatio > 0.3 && harmonicRatio < 0.75 ? 0.15 : 0) -
-    (subBass * 0.4)
-  );
-
-  // VOICE LOW: 80-392Hz, deep resonance, few upper partials
-  result['voice_lo'] = clamp(
-    (bass * 0.4) +
-    (lowMid * 0.3) +
-    (fundamentalHz > 75 && fundamentalHz < 400 ? 0.25 : 0) +
-    (harmonicRatio > 0.25 ? 0.1 : 0) -
-    (high * 0.3) -
-    (air * 0.4)
-  );
-
-  // PIANO: wide range, percussive attack + tonal decay, high spectral flux at onset
-  result['piano'] = clamp(
-    (lowMid * 0.2) +
-    (mid * 0.2) +
-    (highMid * 0.15) +
-    (flux * 0.3) +
-    (harmonicRatio > 0.4 ? 0.1 : 0) +
-    (fundamentalHz > 27 && fundamentalHz < 4200 ? 0.1 : 0)
-  );
-
-  // Blend Claude result (when available) — Claude takes 70% weight
-  if (Object.keys(lastClaudeResult).length > 0) {
-    const blend = 0.70;
-    Object.entries(lastClaudeResult).forEach(([id, val]) => {
-      if (result[id] !== undefined) {
-        result[id] = clamp(blend * val + (1 - blend) * result[id]);
-      }
-    });
-  }
-
-  // Smooth with history
+  // Temporal smoothing over recent frames
   spectralHistory.push({...result});
-  if (spectralHistory.length > 6) spectralHistory.shift();
+  if (spectralHistory.length > 8) spectralHistory.shift();
   const smoothed = {};
   INSTRUMENTS.forEach(inst => {
     smoothed[inst.id] = spectralHistory.reduce((s, h) => s + (h[inst.id] || 0), 0) / spectralHistory.length;
   });
 
-  prevFreqData = freqData.slice();
   return smoothed;
 }
 
-function clamp(v, lo = 0, hi = 1) { return Math.max(lo, Math.min(hi, v || 0)); }
-
-// Alias for the animation loop
-function detectInstruments(freqData, sampleRate) {
-  return detectInstrumentsSpectral(freqData, sampleRate);
-}
-
+// ─── BASIC SPECTRAL UTILITIES (for display metrics only) ─────────────────
 function getDominantPitch(freqData, sampleRate) {
   let maxVal = 0, maxIdx = 0;
-  // Search only below 4kHz for fundamentals
   const limit = Math.floor(4000 / (sampleRate / 2) * freqData.length);
   for (let i = 2; i < limit; i++) {
     if (freqData[i] > maxVal) { maxVal = freqData[i]; maxIdx = i; }
@@ -1310,8 +970,6 @@ function getRMS(timeDomain) {
   }
   return Math.sqrt(sum / timeDomain.length);
 }
-
-// Pre-analysis fires automatically when a file is loaded via preAnalyseSong()
 
 // ─── VISUALIZATION PRIMITIVES ─────────────────────────────────────────────
 function hexToRgb(hex) {
@@ -1494,7 +1152,7 @@ function animate() {
   analyser.getByteTimeDomainData(timeData);
 
   const sampleRate = audioCtx.sampleRate;
-  const instData = detectInstruments(freqData, sampleRate);
+  const instData = detectInstruments();
   const pitch = getDominantPitch(freqData, sampleRate);
   const centroid = getSpectralCentroid(freqData, sampleRate);
   const rms = getRMS(timeData);
@@ -1787,6 +1445,10 @@ function runDemo(type) {
 
   updateStatusDot();
 }
+
+// Expose to global scope for inline onclick handlers
+window.setStyle = setStyle;
+window.runDemo = runDemo;
 
 // Initialize
 clearCanvas();
