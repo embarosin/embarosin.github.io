@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emily Barosin — Ocean Acoustics & Coastal Engineering</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0e1a1f;
+      --paper: #f4f0e8;
+      --ocean: #1a4a5e;
+      --seafoam: #4a9b8e;
+      --sand: #c8b89a;
+      --mist: #8fa8b0;
+      --accent: #d4622a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1.2rem 3rem;
+      background: rgba(244,240,232,0.88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(26,74,94,0.12);
+    }
+    .nav-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      letter-spacing: 0.02em;
+      color: var(--ocean);
+    }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink);
+      text-decoration: none;
+      opacity: 0.65;
+      transition: opacity 0.2s, color 0.2s;
+    }
+    .nav-links a:hover { opacity: 1; color: var(--seafoam); }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-left {
+      display: flex; flex-direction: column; justify-content: flex-end;
+      padding: 6rem 3rem 5rem 5rem;
+      background: var(--ocean);
+      position: relative;
+    }
+    .hero-left::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 20% 80%, rgba(74,155,142,0.25) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--seafoam);
+      margin-bottom: 1.5rem;
+    }
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(3rem, 5vw, 5.5rem);
+      font-weight: 400;
+      color: var(--paper);
+      line-height: 1.05;
+      margin-bottom: 2rem;
+    }
+    h1 em {
+      font-style: italic;
+      color: var(--sand);
+    }
+    .hero-tagline {
+      font-size: 0.95rem;
+      color: var(--mist);
+      line-height: 1.7;
+      max-width: 38ch;
+      margin-bottom: 2.5rem;
+    }
+    .hero-cta {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--paper);
+      border: 1px solid rgba(244,240,232,0.35);
+      padding: 0.8rem 1.8rem;
+      text-decoration: none;
+      transition: background 0.25s, border-color 0.25s;
+    }
+    .hero-cta:hover { background: rgba(244,240,232,0.1); border-color: var(--seafoam); }
+
+    .hero-right {
+      background: var(--ink);
+      position: relative;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* Wave SVG animation */
+    .wave-container {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .wave-svg { width: 110%; opacity: 0.18; }
+    .hero-img-placeholder {
+      position: relative; z-index: 2;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      border: 2px solid rgba(74,155,142,0.4);
+      overflow: hidden;
+      background: rgba(26,74,94,0.6);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .hero-img-placeholder img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: none; /* show when real image added */
+    }
+    .placeholder-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--mist);
+      text-align: center;
+      padding: 0 1rem;
+    }
+    .placeholder-icon { font-size: 2.5rem; opacity: 0.4; }
+
+    /* ── SECTION BASE ── */
+    section { padding: 6rem 0; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 3rem; }
+    .section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--seafoam);
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 3.5vw, 3rem);
+      font-weight: 400;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+    .section-intro {
+      font-size: 1rem;
+      line-height: 1.75;
+      color: #3a4a50;
+      max-width: 60ch;
+      margin-bottom: 3.5rem;
+    }
+
+    /* ── ABOUT ── */
+    #about { background: var(--paper); }
+    .about-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: start;
+    }
+    .about-text p {
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #2a3a40;
+      margin-bottom: 1.2rem;
+    }
+    .skills-block { margin-top: 2rem; }
+    .skills-block h3 {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--mist);
+      margin-bottom: 1rem;
+    }
+    .skill-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--sand);
+      color: var(--ocean);
+      background: rgba(200,184,154,0.15);
+    }
+    .about-stats {
+      display: flex; flex-direction: column; gap: 1.5rem;
+      padding-top: 1rem;
+    }
+    .stat-item {
+      border-left: 2px solid var(--seafoam);
+      padding-left: 1.25rem;
+    }
+    .stat-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.5rem;
+      color: var(--ocean);
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 0.82rem;
+      color: var(--mist);
+      margin-top: 0.25rem;
+    }
+
+    /* ── RESEARCH ── */
+    #research { background: #e8e4dc; }
+    .research-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5px;
+      background: var(--sand);
+    }
+    .research-card {
+      background: #e8e4dc;
+      padding: 2rem;
+      transition: background 0.25s;
+      position: relative;
+    }
+    .research-card:hover { background: var(--paper); }
+    .card-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--sand);
+      margin-bottom: 1rem;
+    }
+    .research-card h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      font-weight: 400;
+      color: var(--ocean);
+      margin-bottom: 0.75rem;
+      line-height: 1.3;
+    }
+    .research-card p {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: #3a4a50;
+      margin-bottom: 1.25rem;
+    }
+    /* Media slot inside research card */
+    .media-slot {
+      width: 100%;
+      aspect-ratio: 16/9;
+      background: rgba(26,74,94,0.08);
+      border: 1.5px dashed var(--sand);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 0.4rem;
+      margin-top: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .media-slot img, .media-slot video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none; /* set to block when src added */
+    }
+    .media-slot-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--mist);
+      text-align: center;
+    }
+    .media-slot-icon { font-size: 1.5rem; opacity: 0.3; }
+    .card-link {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--seafoam);
+      text-decoration: none;
+    }
+    .card-link:hover { color: var(--accent); }
+
+    /* ── PUBLICATIONS ── */
+    #publications { background: var(--ocean); }
+    #publications h2 { color: var(--paper); }
+    #publications .section-label { color: var(--seafoam); }
+    #publications .section-intro { color: var(--mist); }
+    .pub-list { display: flex; flex-direction: column; gap: 1px; background: rgba(244,240,232,0.1); }
+    .pub-item {
+      background: var(--ocean);
+      padding: 1.5rem 0;
+      border-bottom: 1px solid rgba(244,240,232,0.1);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.5rem;
+      align-items: start;
+      transition: background 0.2s;
+    }
+    .pub-item:hover { background: rgba(74,155,142,0.08); }
+    .pub-year {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--seafoam);
+      padding-top: 0.15rem;
+      min-width: 3.5rem;
+    }
+    .pub-content { }
+    .pub-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--paper);
+      margin-bottom: 0.35rem;
+    }
+    .pub-venue {
+      font-size: 0.8rem;
+      color: var(--mist);
+    }
+    .pub-link {
+      display: inline-block;
+      margin-top: 0.4rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      color: var(--seafoam);
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.2s;
+    }
+    .pub-link:hover { border-color: var(--seafoam); }
+
+    /* ── PROJECTS / SIDE WORK ── */
+    #projects { background: var(--paper); }
+    .projects-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+    }
+    .project-card {
+      position: relative;
+      border: 1px solid rgba(200,184,154,0.5);
+      overflow: hidden;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+    .project-card:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(26,74,94,0.1); }
+    .project-media {
+      width: 100%; aspect-ratio: 4/3;
+      background: var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .project-media img, .project-media video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .project-media-hint {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--mist);
+      text-align: center;
+      z-index: 1;
+    }
+    .project-type-badge {
+      position: absolute; top: 0.75rem; right: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.25rem 0.6rem;
+      background: var(--accent);
+      color: white;
+      z-index: 2;
+    }
+    .project-info { padding: 1.25rem; }
+    .project-info h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 400;
+      color: var(--ocean);
+      margin-bottom: 0.5rem;
+    }
+    .project-info p {
+      font-size: 0.83rem;
+      line-height: 1.65;
+      color: #4a5a60;
+    }
+    .project-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.75rem; }
+    .project-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.08em;
+      padding: 0.2rem 0.5rem;
+      background: rgba(200,184,154,0.25);
+      color: var(--mist);
+    }
+
+    /* ── ART ── */
+    #art { background: #1a1a18; }
+    #art h2 { color: var(--paper); }
+    #art .section-label { color: var(--seafoam); }
+    #art .section-intro { color: rgba(244,240,232,0.6); }
+    .art-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: auto;
+      gap: 1rem;
+    }
+    .art-item {
+      position: relative;
+      overflow: hidden;
+      background: #2a2a28;
+      cursor: pointer;
+    }
+    .art-item:nth-child(1) { grid-column: span 2; }
+    .art-item:nth-child(4) { grid-column: span 2; }
+    .art-media {
+      width: 100%; aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .art-item:nth-child(1) .art-media,
+    .art-item:nth-child(4) .art-media { aspect-ratio: 2/1; }
+    .art-media img {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      transition: transform 0.4s;
+    }
+    .art-item:hover .art-media img { transform: scale(1.04); }
+    .art-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%);
+      opacity: 0; transition: opacity 0.3s;
+      display: flex; align-items: flex-end;
+      padding: 1rem;
+    }
+    .art-item:hover .art-overlay { opacity: 1; }
+    .art-caption {
+      font-family: 'Playfair Display', serif;
+      font-size: 0.9rem;
+      font-style: italic;
+      color: white;
+    }
+    .art-placeholder-text {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(143,168,176,0.5);
+      text-align: center;
+    }
+    .art-placeholder-icon { font-size: 1.8rem; opacity: 0.2; }
+
+    /* ── CONTACT ── */
+    #contact { background: var(--paper); }
+    .contact-inner {
+      max-width: 640px;
+    }
+    .contact-links { display: flex; flex-direction: column; gap: 1rem; margin-top: 2.5rem; }
+    .contact-link {
+      display: flex; align-items: center; gap: 1.5rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      text-decoration: none;
+      color: var(--ocean);
+      padding: 1rem 1.25rem;
+      border: 1px solid rgba(200,184,154,0.5);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .contact-link:hover { background: rgba(74,155,142,0.06); border-color: var(--seafoam); }
+    .contact-link-label { opacity: 0.5; min-width: 6rem; font-size: 0.65rem; letter-spacing: 0.15em; }
+    .contact-link-value { flex: 1; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--ink);
+      color: rgba(244,240,232,0.35);
+      text-align: center;
+      padding: 2rem;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.1em;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      nav { padding: 1rem 1.5rem; }
+      .nav-links { gap: 1.2rem; }
+      #hero { grid-template-columns: 1fr; }
+      .hero-right { display: none; }
+      .hero-left { padding: 8rem 2rem 4rem; }
+      .about-grid, .projects-grid { grid-template-columns: 1fr; }
+      .art-grid { grid-template-columns: repeat(2, 1fr); }
+      .art-item:nth-child(1), .art-item:nth-child(4) { grid-column: span 2; }
+      .container { padding: 0 1.5rem; }
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes waveFloat {
+      0% { transform: translateX(0) translateY(0); }
+      50% { transform: translateX(-3%) translateY(2%); }
+      100% { transform: translateX(0) translateY(0); }
+    }
+    .wave-svg { animation: waveFloat 8s ease-in-out infinite; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero-eyebrow { animation: fadeUp 0.7s ease both; }
+    h1 { animation: fadeUp 0.7s 0.15s ease both; }
+    .hero-tagline { animation: fadeUp 0.7s 0.3s ease both; }
+    .hero-cta { animation: fadeUp 0.7s 0.45s ease both; }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="nav-name">Emily Barosin</span>
+  <ul class="nav-links">
+    <li><a href="#about">About</a></li>
+    <li><a href="#research">Research</a></li>
+    <li><a href="#publications">Publications</a></li>
+    <li><a href="#projects">Projects</a></li>
+    <li><a href="#art">Art</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-left">
+    <p class="hero-eyebrow">Ocean Acoustics · Coastal Engineering · EIT</p>
+    <h1>Emily<br /><em>Barosin</em></h1>
+    <p class="hero-tagline">
+      I love sound, art, physics, and all of the beautiful things we can glean at their intersection. I use my quantitative skills in signal processing, machine learning, and logical problem solving to understand and protect underwater environments.
+    </p>
+    <a href="#about" class="hero-cta">Explore my work</a>
+  </div>
+  <div class="hero-right">
+    <div class="wave-container">
+      <!-- Decorative animated wave -->
+      <svg class="wave-svg" viewBox="0 0 900 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 200 Q150 100 300 200 Q450 300 600 200 Q750 100 900 200 L900 400 L0 400Z" fill="#4a9b8e"/>
+        <path d="M0 240 Q180 140 360 240 Q540 340 720 240 Q810 190 900 240 L900 400 L0 400Z" fill="#1a4a5e" opacity="0.8"/>
+        <path d="M0 280 Q200 200 400 280 Q600 360 800 280 L900 280 L900 400 L0 400Z" fill="#0e1a1f" opacity="0.6"/>
+      </svg>
+    </div>
+    <div class="hero-img-placeholder">
+      <!-- Replace src below with your headshot path, then set display:block on the img -->
+      <img src="headshot.jpg" alt="Emily Barosin" style="display:block;" />
+      <span class="placeholder-icon">🌊</span>
+      <p class="placeholder-text">Add headshot:<br/>replace src="your-headshot.jpg"</p>
+    </div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about">
+  <div class="container">
+    <p class="section-label">// 01 — About</p>
+    <h2>Arts &amp; Sciences</h2>
+    <div class="about-grid">
+      <div class="about-text">
+        <p>
+          I'm a scientist and engineer at Integral Consulting, Inc., working at the intersection of ocean acoustics, coastal sciences, and machine learning. My work spans underwater soundscape monitoring, acoustic vector sensor analysis, and finding solutions to coastal challenges.
+        </p>
+        <p>
+          I hold a B.A. and B.E. from Dartmouth College, where my honors thesis developed a structural health monitoring system for underwater turbines using passive acoustic monitoring. I'm also an Engineer-in-Training (EIT).
+        </p>
+        <p>
+          Outside the lab, I've captained Dartmouth's cheer team after competing in the sport for 17 years, co-led a Dartmouth Humanitarian Engineering project, and pursued a range of creative side projects.
+        </p>
+        <div class="skills-block">
+          <h3>Technical Skills</h3>
+          <div class="skill-tags">
+            <span class="tag">Python</span>
+            <span class="tag">PyTorch</span>
+            <span class="tag">TensorFlow</span>
+            <span class="tag">MATLAB</span>
+            <span class="tag">Julia</span>
+            <span class="tag">Ansys CFD</span>
+            <span class="tag">Signal Processing</span>
+            <span class="tag">Acoustics</span>
+            <span class="tag">Machine Learning</span>
+            <span class="tag">Coastal Sciences</span>
+            <span class="tag">XBeach</span>
+            <span class="tag">Acoustic Vector Sensors</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RESEARCH -->
+<section id="research">
+  <div class="container">
+    <p class="section-label">// 02 — Research</p>
+    <h2>What I Work On</h2>
+    <div class="research-grid">
+
+      <div class="research-card">
+        <p class="card-num">01 —</p>
+        <h3>Acoustic Vector Sensor Analysis</h3>
+        <p>Developing novel visualization and data processing methods for single-hydrophone localization and soundscape monitoring, with applications in offshore energy permitting and sound field verification.</p>
+        <div class="media-slot">
+          <!-- To add an image: set img src and change display to block -->
+          <!-- To add a video: set video src and change display to block -->
+          <img src="avs-visualization.png" alt="Acoustic vector sensor visualization" style="display:block;" />
+          <video src="your-avs-video.mp4" controls></video>
+          <span class="media-slot-icon">📡</span>
+          <p class="media-slot-text">Add image or video visualization here</p>
+        </div>
+        <br/>
+        <a href="https://doi.org/10.1121/10.0036394" target="_blank" class="card-link">→ See related publications</a>
+      </div>
+
+      <div class="research-card">
+        <p class="card-num">02 —</p>
+        <h3>Turbine Structural Health Monitoring</h3>
+        <p>Honors thesis work: designed a tank experiment using passive acoustic monitoring to detect structural damage in underwater turbine blades. Built a custom small-scale turbine with prefabricated faults for acoustic data collection.</p>
+        <div class="media-slot">
+          <img src="turbine-experiment.png" alt="Turbine experiment" style="display:block;" />
+          <video src="your-turbine-video.mp4" controls></video>
+          <span class="media-slot-icon">🌀</span>
+          <p class="media-slot-text">Add image or video of tank experiment</p>
+        </div>
+        <br/>
+        <a href="your-thesis-link.pdf" class="card-link">→ Read thesis (PDF)</a>
+      </div>
+
+      <div class="research-card">
+        <p class="card-num">03 —</p>
+        <h3>ML-Based Surf Quality Prediction</h3>
+        <p>Advancing machine learning post-processing of hydrostatic wave models (XBeach) to produce more accurate surf quality analysis.</p>
+        <div class="media-slot">
+          <img src="surf-quality.png" alt="Surf model output" style="display:block;" />
+          <video src="your-surf-video.mp4" controls></video>
+          <span class="media-slot-icon">🏄</span>
+          <p class="media-slot-text">Add model output visualization or field photo</p>
+        </div>
+      </div>
+
+      <div class="research-card">
+        <p class="card-num">04 —</p>
+        <h3>Seagrass Acoustic Propagation</h3>
+        <p>Field experiment at Stony Brook investigating diurnal effects of photosynthetic activity on sound propagation through shallow eelgrass meadows.</p>
+        <div class="media-slot">
+          <img src="seagrass.png" alt="Seagrass field experiment" style="display:block;" />
+          <video src="your-seagrass-video.mp4" controls></video>
+          <span class="media-slot-icon">🌿</span>
+          <p class="media-slot-text">Add field photo or spectrogram</p>
+        </div>
+      </div>
+
+      <div class="research-card">
+        <p class="card-num">05 —</p>
+        <h3>Vertical-Axis Tidal Turbine</h3>
+        <p>Invented and fabricated a power-productive VATT for low-flow environments as part of the Marine Energy Collegiate Competition (MECC). Led Phase I testing at UNH Chase Ocean Engineering Lab. Awarded $20k DOE grant.</p>
+        <div class="media-slot">
+          <img src="vatt.png" alt="Tidal turbine" style="display:block;" />
+          <video src="your-vatt-video.mp4" controls></video>
+          <span class="media-slot-icon">⚙️</span>
+          <p class="media-slot-text">Add turbine photo or CFD visualization</p>
+        </div>
+      </div>
+
+      <div class="research-card">
+        <p class="card-num">06 —</p>
+        <h3>Computer Vision for Lost Fishing Gear Detection</h3>
+        <p>Developing a computer vision machine learning system integrated with an unmanned underwater vehicle (UUV) to detect lost fishing gear in the water column — gear that poses a secondary entanglement risk to marine mammals and other protected species.</p>
+        <div class="media-slot">
+          <img src="auv.png" alt="Lost fishing gear detection" style="display:block;" />
+          <video src="your-gear-video.mp4" controls></video>
+          <span class="media-slot-icon">🎣</span>
+          <p class="media-slot-text">Add image or video visualization here</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- PUBLICATIONS -->
+<section id="publications">
+  <div class="container">
+    <p class="section-label">// 03 — Publications & Presentations</p>
+    <h2>Research Output</h2>
+    <p class="section-intro">Peer-reviewed publications and international conference presentations.</p>
+    <div class="pub-list">
+
+      <div class="pub-item">
+        <span class="pub-year">2026</span>
+        <div class="pub-content">
+          <p class="pub-title">On Directional Filtering for Sound Source Verification and Source Level Estimation</p>
+          <p class="pub-venue">In: <em>Effects of Noise on Aquatic Life IV</em>, Springer, Cham — Barosin &amp; Raghukumar</p>
+        </div>
+      </div>
+
+      <div class="pub-item">
+        <span class="pub-year">2025</span>
+        <div class="pub-content">
+          <p class="pub-title">Towards more accurate sound field verification using directional acoustic filtering</p>
+          <p class="pub-venue"><em>JASA Express Letters</em>, 5(4) — Barosin &amp; Raghukumar</p>
+          <a href="https://doi.org/10.1121/10.0036394" class="pub-link" target="_blank">→ doi: 10.1121/10.0036394</a>
+        </div>
+      </div>
+
+      <div class="pub-item">
+        <span class="pub-year">2026</span>
+        <div class="pub-content">
+          <p class="pub-title">Directional acoustic filtering for sound field estimation and verification</p>
+          <p class="pub-venue">State of the Science on Offshore Energy, Wildlife, and Fisheries — Long Island, NY (accepted)</p>
+        </div>
+      </div>
+
+      <div class="pub-item">
+        <span class="pub-year">2026</span>
+        <div class="pub-content">
+          <p class="pub-title">Demonstration of a directional acoustic profiling float powered by ocean thermal energy conversion</p>
+          <p class="pub-venue">Acoustical Society of America — Philadelphia, PA (invited)</p>
+        </div>
+      </div>
+
+      <div class="pub-item">
+        <span class="pub-year">2025</span>
+        <div class="pub-content">
+          <p class="pub-title">Towards more accurate sound field verification using directional acoustic filtering</p>
+          <p class="pub-venue">Acoustical Society of America — New Orleans, LA &amp; Effects of Noise on Aquatic Life, Prague</p>
+        </div>
+      </div>
+
+      <div class="pub-item">
+        <span class="pub-year">2023</span>
+        <div class="pub-content">
+          <p class="pub-title">Diurnal measurements of sound attenuation (100 Hz–10 kHz) in a shallow seagrass meadow</p>
+          <p class="pub-venue">Acoustical Society of America — Sydney, Australia</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SIDE PROJECTS -->
+<section id="projects">
+  <div class="container">
+    <p class="section-label">// 04 — Side Projects</p>
+    <h2>Beyond the Lab</h2>
+    <p class="section-intro">Generalist work — engineering, code, and whatever else looked interesting.</p>
+    <div class="projects-grid">
+
+      <!-- Project 1 — Edit with your own project -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="your-project1-image.jpg" alt="Project 1" />
+          <span class="media-slot-icon" style="font-size:2rem;opacity:0.2;position:relative;z-index:1;">🔧</span>
+          <p class="project-media-hint" style="position:relative;z-index:1;">Add project image here</p>
+          <span class="project-type-badge">Engineering</span>
+        </div>
+        <div class="project-info">
+          <h3>Gravity-Powered Washing Machine</h3>
+          <p>Co-led Dartmouth Humanitarian Engineering Project — designed and fabricated a washing machine for communities without reliable electricity. Environmental technical lead and team liaison to Thayer School admin.</p>
+          <div class="project-tags">
+            <span class="project-tag">Humanitarian</span>
+            <span class="project-tag">Fabrication</span>
+            <span class="project-tag">Design</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project 2 — your own project -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="your-project2-image.jpg" alt="Project 2" />
+          <span class="media-slot-icon" style="font-size:2rem;opacity:0.2;position:relative;z-index:1;">🐍</span>
+          <p class="project-media-hint" style="position:relative;z-index:1;">Add project image here</p>
+          <span class="project-type-badge">Software</span>
+        </div>
+        <div class="project-info">
+          <h3>Internal Metocean Python Package</h3>
+          <p>Built an internal-use Python library at Integral Consulting to streamline coastal engineering and metocean data analysis workflows across the team.</p>
+          <div class="project-tags">
+            <span class="project-tag">Python</span>
+            <span class="project-tag">Open Source</span>
+            <span class="project-tag">Coastal Eng.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project 3 — placeholder for your own -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="your-project3-image.jpg" alt="Project 3" />
+          <span class="media-slot-icon" style="font-size:2rem;opacity:0.2;position:relative;z-index:1;">✨</span>
+          <p class="project-media-hint" style="position:relative;z-index:1;">Add project image here</p>
+          <span class="project-type-badge">Your Category</span>
+        </div>
+        <div class="project-info">
+          <h3>Your Project Title Here</h3>
+          <p>Describe your side project — what you built, why, and what you learned. Replace this placeholder with one of your own fun or miscellaneous projects.</p>
+          <div class="project-tags">
+            <span class="project-tag">Tag 1</span>
+            <span class="project-tag">Tag 2</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ART -->
+<section id="art">
+  <div class="container">
+    <p class="section-label">// 05 — Art & Creative Work</p>
+    <h2>Creative Practice</h2>
+    <p class="section-intro">Making things with hands, code, and whatever else is nearby.</p>
+    <div class="art-grid">
+
+      <!-- Art piece 1 (wide) -->
+      <div class="art-item">
+        <div class="art-media">
+          <!-- Replace src with your image path, set display:block -->
+          <img src="your-art1.jpg" alt="Art piece 1" />
+          <span class="art-placeholder-icon">🎨</span>
+          <p class="art-placeholder-text">Art piece 1<br/>(wide format)</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+      <!-- Art piece 2 -->
+      <div class="art-item">
+        <div class="art-media">
+          <img src="your-art2.jpg" alt="Art piece 2" />
+          <span class="art-placeholder-icon">✏️</span>
+          <p class="art-placeholder-text">Art piece 2</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+      <!-- Art piece 3 -->
+      <div class="art-item">
+        <div class="art-media">
+          <img src="your-art3.jpg" alt="Art piece 3" />
+          <span class="art-placeholder-icon">📷</span>
+          <p class="art-placeholder-text">Art piece 3</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+      <!-- Art piece 4 (wide) -->
+      <div class="art-item">
+        <div class="art-media">
+          <img src="your-art4.jpg" alt="Art piece 4" />
+          <span class="art-placeholder-icon">🎭</span>
+          <p class="art-placeholder-text">Art piece 4<br/>(wide format)</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+      <!-- Art piece 5 -->
+      <div class="art-item">
+        <div class="art-media">
+          <img src="your-art5.jpg" alt="Art piece 5" />
+          <span class="art-placeholder-icon">🎵</span>
+          <p class="art-placeholder-text">Art piece 5</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+      <!-- Art piece 6 -->
+      <div class="art-item">
+        <div class="art-media">
+          <img src="your-art6.jpg" alt="Art piece 6" />
+          <span class="art-placeholder-icon">🌸</span>
+          <p class="art-placeholder-text">Art piece 6</p>
+        </div>
+        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="container">
+    <div class="contact-inner">
+      <p class="section-label">// 06 — Contact</p>
+      <h2>Get in Touch</h2>
+      <p class="section-intro">Open to research collaborations, speaking invitations, and interesting problems.</p>
+      <div class="contact-links">
+        <a href="/cdn-cgi/l/email-protection#2441464645564b574d4a644349454d480a474b49" class="contact-link">
+          <span class="contact-link-label">Email</span>
+          <span class="contact-link-value"><span class="__cf_email__" data-cfemail="f194939390839e82989fb1969c90989ddf929e9c">[email&#160;protected]</span></span>
+          <span>→</span>
+        </a>
+        <a href="https://www.linkedin.com/in/emily-barosin" target="_blank" class="contact-link">
+          <span class="contact-link-label">LinkedIn</span>
+          <span class="contact-link-value">linkedin.com/in/emily-barosin</span>
+          <span>→</span>
+        </a>
+        <a href="EBarosin_CV_Feb26.pdf" class="contact-link">
+          <span class="contact-link-label">CV / Résumé</span>
+          <span class="contact-link-value">Download PDF</span>
+          <span>↓</span>
+        </a>
+        <!-- Add GitHub, Google Scholar, etc. as needed -->
+        <a href="https://scholar.google.com/scholar?q=Emily+Barosin" target="_blank" class="contact-link">
+          <span class="contact-link-label">Google Scholar</span>
+          <span class="contact-link-value">Search publications</span>
+          <span>→</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<fo
