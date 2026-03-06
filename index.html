@@ -185,9 +185,9 @@
     #about { background: var(--paper); }
     .about-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr auto;
       gap: 4rem;
-      align-items: start;
+      align-items: center;
     }
     .about-text p {
       font-size: 1rem;
@@ -560,9 +560,8 @@
   <ul class="nav-links">
     <li><a href="#about">About</a></li>
     <li><a href="#research">Research</a></li>
-    <li><a href="#publications">Publications</a></li>
     <li><a href="#projects">Projects</a></li>
-    <li><a href="#art">Art</a></li>
+    <li><a href="#publications">Publications</a></li>
     <li><a href="#contact">Contact</a></li>
   </ul>
 </nav>
@@ -626,11 +625,12 @@
           </div>
         </div>
       </div>
+      <div class="about-whale">
+        <img src="whale.png" alt="Acoustic whale visualization" style="width: 260px; transform: rotate(-45deg); display: block;" />
+      </div>
     </div>
   </div>
 </section>
-
-<!-- RESEARCH -->
 <section id="research">
   <div class="container">
     <p class="section-label">// 02 — Research</p>
@@ -655,16 +655,14 @@
 
       <div class="research-card">
         <p class="card-num">02 —</p>
-        <h3>Turbine Structural Health Monitoring</h3>
-        <p>Honors thesis work: designed a tank experiment using passive acoustic monitoring to detect structural damage in underwater turbine blades. Built a custom small-scale turbine with prefabricated faults for acoustic data collection.</p>
+        <h3>Computer Vision for Lost Fishing Gear Detection</h3>
+        <p>Developing a computer vision machine learning system integrated with an unmanned underwater vehicle (UUV) to detect lost fishing gear in the water column — gear that poses a secondary entanglement risk to marine mammals and other protected species.</p>
         <div class="media-slot">
-          <img src="turbine-experiment.png" alt="Turbine experiment" style="display:block;" />
-          <video src="your-turbine-video.mp4" controls></video>
+          <img src="auv.png" alt="Lost fishing gear detection" style="display:block;" />
+          <video src="your-gear-video.mp4" controls></video>
 
 
         </div>
-        <br/>
-        <a href="https://engineering.dartmouth.edu/news/student-awarded-2024-25-mazilu-engineering-research-fellowship" target="_blank" class="card-link">→ Read more about the project</a>
       </div>
 
       <div class="research-card">
@@ -705,13 +703,84 @@
 
       <div class="research-card">
         <p class="card-num">06 —</p>
-        <h3>Computer Vision for Lost Fishing Gear Detection</h3>
-        <p>Developing a computer vision machine learning system integrated with an unmanned underwater vehicle (UUV) to detect lost fishing gear in the water column — gear that poses a secondary entanglement risk to marine mammals and other protected species.</p>
+        <h3>Turbine Structural Health Monitoring</h3>
+        <p>Honors thesis work: designed a tank experiment using passive acoustic monitoring to detect structural damage in underwater turbine blades. Built a custom small-scale turbine with prefabricated faults for acoustic data collection.</p>
         <div class="media-slot">
-          <img src="auv.png" alt="Lost fishing gear detection" style="display:block;" />
-          <video src="your-gear-video.mp4" controls></video>
+          <img src="turbine-experiment.png" alt="Turbine experiment" style="display:block;" />
+          <video src="your-turbine-video.mp4" controls></video>
 
 
+        </div>
+        <br/>
+        <a href="https://engineering.dartmouth.edu/news/student-awarded-2024-25-mazilu-engineering-research-fellowship" target="_blank" class="card-link">→ Read more about the project</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SIDE PROJECTS -->
+<section id="projects">
+  <div class="container">
+    <p class="section-label">// 03 — Other Projects</p>
+    <h2>Beyond the Lab</h2>
+    <p class="section-intro">Generalist work — engineering, code, and whatever else looked interesting.</p>
+    <div class="projects-grid">
+
+      <!-- Project 1 — Synesthesia visualizer -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="synesthesia-preview.png" alt="Synesthesia visualizer" style="display:block;" />
+          <span class="project-type-badge">Art + Code</span>
+        </div>
+        <div class="project-info">
+          <h3>Synesthetic Music Visualizer</h3>
+          <p>I have audio-visual synesthesia — it has made me fascinated with the way the brain finds patterns. I associate different timbres (instruments) with different colors. This tool mimics the way songs appear to me.</p>
+          <div class="project-tags">
+            <span class="project-tag">Synesthesia</span>
+            <span class="project-tag">Visualization</span>
+            <span class="project-tag">Audio</span>
+          </div>
+          <br/>
+          <a href="synesthesia.html" target="_blank" class="card-link">→ Try the visualizer</a>
+        </div>
+      </div>
+
+      <!-- Project 2 — Decision Tree -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="decision-tree-preview.png" alt="Decision Tree EV Calculator" style="display:block;" />
+          <span class="project-type-badge">Tool</span>
+        </div>
+        <div class="project-info">
+          <h3>Decision Tree EV Calculator</h3>
+          <p>An interactive GUI for building decision trees and computing expected values across branching outcomes. Useful for thinking rigorously about uncertainty.</p>
+          <div class="project-tags">
+            <span class="project-tag">Decision Theory</span>
+            <span class="project-tag">Expected Value</span>
+            <span class="project-tag">Interactive</span>
+          </div>
+          <br/>
+          <a href="decision-tree.html" target="_blank" class="card-link">→ Try the tool</a>
+        </div>
+      </div>
+
+      <!-- Project 3 — Cheer Formation Planner -->
+      <div class="project-card">
+        <div class="project-media">
+          <img src="cheer-preview.png" alt="Cheer Formation Planner" style="display:block;" />
+          <span class="project-type-badge">Tool</span>
+        </div>
+        <div class="project-info">
+          <h3>Cheer Formation Planner</h3>
+          <p>Cheer formation tool that I leveraged during routine design.</p>
+          <div class="project-tags">
+            <span class="project-tag">Choreography</span>
+            <span class="project-tag">Planning</span>
+            <span class="project-tag">Interactive</span>
+          </div>
+          <br/>
+          <a href="cheer-formation-planner.html" target="_blank" class="card-link">→ Try the tool</a>
         </div>
       </div>
 
@@ -722,7 +791,7 @@
 <!-- PUBLICATIONS -->
 <section id="publications">
   <div class="container">
-    <p class="section-label">// 03 — Publications & Presentations</p>
+    <p class="section-label">// 04 — Publications & Presentations</p>
     <h2>Research Output</h2>
     <p class="section-intro">Peer-reviewed publications and international conference presentations.</p>
     <div class="pub-list">
@@ -780,152 +849,11 @@
   </div>
 </section>
 
-<!-- SIDE PROJECTS -->
-<section id="projects">
-  <div class="container">
-    <p class="section-label">// 04 — Side Projects</p>
-    <h2>Beyond the Lab</h2>
-    <p class="section-intro">Generalist work — engineering, code, and whatever else looked interesting.</p>
-    <div class="projects-grid">
-
-      <!-- Project 1 — Edit with your own project -->
-      <div class="project-card">
-        <div class="project-media">
-          <img src="your-project1-image.jpg" alt="Project 1" />
-
-
-          <span class="project-type-badge">Engineering</span>
-        </div>
-        <div class="project-info">
-          <h3>Gravity-Powered Washing Machine</h3>
-          <p>Co-led Dartmouth Humanitarian Engineering Project — designed and fabricated a washing machine for communities without reliable electricity. Environmental technical lead and team liaison to Thayer School admin.</p>
-          <div class="project-tags">
-            <span class="project-tag">Humanitarian</span>
-            <span class="project-tag">Fabrication</span>
-            <span class="project-tag">Design</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Project 2 — your own project -->
-      <div class="project-card">
-        <div class="project-media">
-          <img src="your-project2-image.jpg" alt="Project 2" />
-
-
-          <span class="project-type-badge">Software</span>
-        </div>
-        <div class="project-info">
-          <h3>Internal Metocean Python Package</h3>
-          <p>Built an internal-use Python library at Integral Consulting to streamline coastal engineering and metocean data analysis workflows across the team.</p>
-          <div class="project-tags">
-            <span class="project-tag">Python</span>
-            <span class="project-tag">Open Source</span>
-            <span class="project-tag">Coastal Eng.</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Project 3 — placeholder for your own -->
-      <div class="project-card">
-        <div class="project-media">
-          <img src="your-project3-image.jpg" alt="Project 3" />
-
-
-          <span class="project-type-badge">Your Category</span>
-        </div>
-        <div class="project-info">
-          <h3>Your Project Title Here</h3>
-          <p>Describe your side project — what you built, why, and what you learned. Replace this placeholder with one of your own fun or miscellaneous projects.</p>
-          <div class="project-tags">
-            <span class="project-tag">Tag 1</span>
-            <span class="project-tag">Tag 2</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- ART -->
-<section id="art">
-  <div class="container">
-    <p class="section-label">// 05 — Art & Creative Work</p>
-    <h2>Creative Practice</h2>
-    <p class="section-intro">Making things with hands, code, and whatever else is nearby.</p>
-    <div class="art-grid">
-
-      <!-- Art piece 1 (wide) -->
-      <div class="art-item">
-        <div class="art-media">
-          <!-- Replace src with your image path, set display:block -->
-          <img src="your-art1.jpg" alt="Art piece 1" />
-          <span class="art-placeholder-icon">🎨</span>
-          <p class="art-placeholder-text">Art piece 1<br/>(wide format)</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-      <!-- Art piece 2 -->
-      <div class="art-item">
-        <div class="art-media">
-          <img src="your-art2.jpg" alt="Art piece 2" />
-          <span class="art-placeholder-icon">✏️</span>
-          <p class="art-placeholder-text">Art piece 2</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-      <!-- Art piece 3 -->
-      <div class="art-item">
-        <div class="art-media">
-          <img src="your-art3.jpg" alt="Art piece 3" />
-          <span class="art-placeholder-icon">📷</span>
-          <p class="art-placeholder-text">Art piece 3</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-      <!-- Art piece 4 (wide) -->
-      <div class="art-item">
-        <div class="art-media">
-          <img src="your-art4.jpg" alt="Art piece 4" />
-          <span class="art-placeholder-icon">🎭</span>
-          <p class="art-placeholder-text">Art piece 4<br/>(wide format)</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-      <!-- Art piece 5 -->
-      <div class="art-item">
-        <div class="art-media">
-          <img src="your-art5.jpg" alt="Art piece 5" />
-          <span class="art-placeholder-icon">🎵</span>
-          <p class="art-placeholder-text">Art piece 5</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-      <!-- Art piece 6 -->
-      <div class="art-item">
-        <div class="art-media">
-          <img src="your-art6.jpg" alt="Art piece 6" />
-          <span class="art-placeholder-icon">🌸</span>
-          <p class="art-placeholder-text">Art piece 6</p>
-        </div>
-        <div class="art-overlay"><span class="art-caption">Title of work</span></div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
 <!-- CONTACT -->
 <section id="contact">
   <div class="container">
     <div class="contact-inner">
-      <p class="section-label">// 06 — Contact</p>
+      <p class="section-label">// 05 — Contact</p>
       <h2>Get in Touch</h2>
       <p class="section-intro">Open to research collaborations, speaking invitations, and interesting problems.</p>
       <div class="contact-links">

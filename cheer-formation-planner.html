@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🎀 Cheer Formation Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0e1f0e; --panel: #162816; --border: #1f3d1f;
+    --green: #00693E; --sage: #A7C4A0; --mid: #6DAB6A;
+    --text: #e8f0e8; --muted: #7aab7a; --dim: #4a6b4a;
+    --pink: #ff9ebc;
+  }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', 'Segoe UI', sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: #111; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+
+  /* HEADER */
+  #header { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .header-title span { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 3px; }
+  .header-title .t1 { color: var(--pink); }
+  .header-title .t2 { color: var(--green); }
+  .header-title .t3 { color: var(--sage); }
+  #legend { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+
+  /* LAYOUT */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* LEFT PANEL */
+  #left-panel { width: 220px; min-width: 220px; padding: 14px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .panel-title { font-weight: 600; font-size: 12px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+  #add-member-btn { background: var(--green); border: none; color: #fff; border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #add-member-form { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  #add-member-form.hidden { display: none; }
+  input, select { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-family: inherit; font-size: 13px; outline: none; width: 100%; }
+  input:focus, select:focus { border-color: var(--green); }
+  .btn-row { display: flex; gap: 6px; }
+  .btn-add { flex: 1; background: var(--green); border: none; color: #fff; padding: 7px; border-radius: 6px; cursor: pointer; font-weight: 700; font-family: inherit; font-size: 13px; }
+  .btn-cancel { flex: 1; background: var(--border); border: none; color: var(--muted); padding: 7px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; }
+  #members-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; }
+  .member-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; cursor: pointer; background: var(--panel); border: 1px solid var(--border); transition: all 0.15s; }
+  .member-card:hover { border-color: #2a5a2a; }
+  .member-card.selected { border-color: var(--green); }
+  .member-icon { font-size: 14px; flex-shrink: 0; }
+  .member-info { flex: 1; min-width: 0; }
+  .member-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member-role { font-size: 11px; color: #6a8a6a; }
+  .remove-btn { background: transparent; border: none; color: #ff6b6b; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+  .remove-btn:hover { background: rgba(255,100,100,0.12); }
+  #members-empty { color: var(--dim); font-size: 13px; text-align: center; margin-top: 20px; line-height: 1.6; }
+
+  /* CENTER */
+  #center { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 18px 14px; gap: 14px; overflow: auto; }
+  #formation-tabs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .formation-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; transition: all 0.15s; }
+  .formation-btn:hover { border-color: var(--green); color: var(--sage); }
+  .formation-btn.active { background: var(--green); border-color: var(--green); color: #fff; font-weight: 700; }
+  .formation-tab-wrap { display: flex; align-items: center; gap: 3px; }
+  .label-input { background: transparent; border: none; border-bottom: 2px solid var(--green); color: var(--text); padding: 2px 4px; font-family: inherit; font-size: 13px; outline: none; width: 140px; }
+  .icon-btn { background: transparent; border: none; cursor: pointer; color: #ff6b6b; font-size: 13px; padding: 3px 6px; border-radius: 4px; }
+  .icon-btn:hover { background: rgba(255,100,100,0.12); }
+  #add-formation-btn { background: transparent; border: 1px dashed var(--border); color: var(--green); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-family: inherit; font-size: 13px; transition: border-color 0.15s; }
+  #add-formation-btn:hover { border-color: var(--green); }
+  #canvas-wrap { position: relative; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,0.55), 0 0 0 2px #000; }
+  #mat { display: block; max-width: 100%; cursor: default; }
+  #canvas-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+  #canvas-empty-inner { text-align: center; color: rgba(0,0,0,0.18); }
+  #canvas-empty-inner .big { font-size: 44px; }
+  #canvas-empty-inner .msg { font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; }
+  #controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .play-btn { padding: 10px 28px; border-radius: 8px; border: none; font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; transition: all 0.15s; }
+  #play-btn { background: var(--green); color: #fff; }
+  #play-btn:hover { background: #005a34; box-shadow: 0 4px 16px rgba(0,105,62,0.4); }
+  #play-btn:disabled { background: var(--border); color: var(--dim); cursor: not-allowed; box-shadow: none; }
+  #stop-btn { background: var(--border); color: var(--text); display: none; }
+  #stop-btn:hover { background: #2a4d2a; }
+  #pdf-btn { padding: 10px 20px; border-radius: 8px; border: 1px solid #2a5a2a; background: var(--panel); font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 2px; cursor: pointer; color: var(--sage); transition: all 0.15s; }
+  #pdf-btn:hover { border-color: var(--sage); color: #fff; background: var(--border); }
+  #pdf-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  #hint { color: var(--dim); font-size: 12px; text-align: center; }
+  #formations-hint { color: var(--dim); font-size: 13px; }
+
+  /* RIGHT PANEL */
+  #right-panel { width: 200px; min-width: 200px; padding: 14px; border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  #right-title { font-weight: 600; font-size: 12px; letter-spacing: 1px; color: var(--muted); text-transform: uppercase; }
+  .summary-card { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); }
+  .summary-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .summary-pos { font-size: 10px; color: #5a7a5a; }
+  .summary-unplaced { font-size: 10px; color: #ff6b6b; }
+
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="header-title">
+    <span class="t1">🎀 CHEER </span><span class="t2">FORMATION </span><span class="t3">PLANNER</span>
+  </div>
+  <div id="legend"></div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- LEFT: Members -->
+  <div id="left-panel">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <span class="panel-title">Team Members</span>
+      <button id="add-member-btn" title="Add member">+</button>
+    </div>
+    <div id="add-member-form" class="hidden">
+      <input id="new-name" placeholder="Name" autocomplete="off"/>
+      <select id="new-role"></select>
+      <div class="btn-row">
+        <button class="btn-add" id="confirm-add-btn">Add</button>
+        <button class="btn-cancel" id="cancel-add-btn">Cancel</button>
+      </div>
+    </div>
+    <div id="members-list">
+      <div id="members-empty">Add team members<br/>to get started</div>
+    </div>
+  </div>
+
+  <!-- CENTER: Canvas -->
+  <div id="center">
+    <div id="formation-tabs">
+      <button id="add-formation-btn">+ Add Formation</button>
+    </div>
+    <div id="canvas-wrap">
+      <canvas id="mat" width="600" height="360"></canvas>
+      <div id="canvas-empty">
+        <div id="canvas-empty-inner">
+          <div class="big">🎀</div>
+          <div class="msg">ADD MEMBERS TO BEGIN</div>
+        </div>
+      </div>
+    </div>
+    <div id="controls">
+      <button class="play-btn" id="play-btn" disabled>▶ PLAY ROUTINE</button>
+      <button class="play-btn" id="stop-btn">■ STOP</button>
+      <button id="pdf-btn" disabled>⬇ SAVE PDF</button>
+    </div>
+    <div id="formations-hint" style="display:none">Add at least 2 formations to play</div>
+    <div id="hint" style="display:none">Drag members to position · Double-click a tab to rename · Hit Play to animate</div>
+  </div>
+
+  <!-- RIGHT: Summary -->
+  <div id="right-panel">
+    <div id="right-title">Formation 1</div>
+    <div id="summary-list"></div>
+
+  </div>
+
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const ROLES = {
+  Flyer:    { color: '#FFFFFF', shape: 'star',    label: 'Flyer' },
+  Base:     { color: '#00693E', shape: 'circle',  label: 'Base' },
+  Backspot: { color: '#A7C4A0', shape: 'diamond', label: 'Backspot' },
+  Tumbler:  { color: '#6DAB6A', shape: 'square',  label: 'Tumbler' },
+};
+const FIELD_W = 600, FIELD_H = 360, MEMBER_R = 18, ANIM_MS = 800;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let members = [];           // [{id, name, role}]
+let formations = [{}];      // [{memberId: {x,y}}]
+let formationLabels = ['Formation 1'];
+let activeFormation = 0;
+let selectedMember = null;
+let dragging = null;        // {id, offsetX, offsetY}
+let playing = false;
+let animPositions = {};     // {memberId: {x,y}}
+let animRef = null;
+let playState = null;       // {cancelled}
+
+// ─── Canvas ───────────────────────────────────────────────────────────────────
+const canvas = document.getElementById('mat');
+const ctx = canvas.getContext('2d');
+
+function drawMat(c) {
+  c.fillStyle = '#ffffff';
+  c.fillRect(0, 0, FIELD_W, FIELD_H);
+  c.strokeStyle = 'rgba(0,0,0,0.07)';
+  c.lineWidth = 1;
+  for (let i = 1; i < 6; i++) { c.beginPath(); c.moveTo(FIELD_W/6*i,0); c.lineTo(FIELD_W/6*i,FIELD_H); c.stroke(); }
+  for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(0,FIELD_H/4*i); c.lineTo(FIELD_W,FIELD_H/4*i); c.stroke(); }
+  c.beginPath(); c.arc(FIELD_W/2,FIELD_H/2,50,0,Math.PI*2);
+  c.strokeStyle = 'rgba(0,0,0,0.1)'; c.lineWidth = 1.5; c.stroke();
+  c.strokeStyle = '#000'; c.lineWidth = 3; c.strokeRect(1.5,1.5,FIELD_W-3,FIELD_H-3);
+}
+
+function drawShape(c, shape, x, y, r, color, label, selected) {
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,0.25)'; c.shadowBlur = selected ? 14 : 5; c.shadowOffsetY = 2;
+  c.beginPath();
+  if (shape === 'circle') { c.arc(x,y,r,0,Math.PI*2); }
+  else if (shape === 'square') { c.rect(x-r,y-r,r*2,r*2); }
+  else if (shape === 'diamond') { c.moveTo(x,y-r); c.lineTo(x+r,y); c.lineTo(x,y+r); c.lineTo(x-r,y); c.closePath(); }
+  else { // star
+    for (let i=0;i<10;i++) {
+      const a=(i*Math.PI)/5-Math.PI/2, rad=i%2===0?r:r*0.45;
+      if (i===0) c.moveTo(x+Math.cos(a)*rad,y+Math.sin(a)*rad);
+      else c.lineTo(x+Math.cos(a)*rad,y+Math.sin(a)*rad);
+    }
+    c.closePath();
+  }
+  c.fillStyle = color; c.fill();
+  c.shadowBlur = 0; c.shadowOffsetY = 0;
+  if (selected) { c.strokeStyle='#00693E'; c.lineWidth=3; c.stroke(); }
+  else if (color==='#FFFFFF') { c.strokeStyle='#bbb'; c.lineWidth=1.5; c.stroke(); }
+  const isDark = color==='#00693E'||color==='#6DAB6A';
+  c.fillStyle = isDark ? '#fff' : '#1a1a1a';
+  c.font = "bold 9px 'DM Sans',sans-serif";
+  c.textAlign='center'; c.textBaseline='middle';
+  c.fillText(label.length>5?label.slice(0,5):label, x, y);
+  c.restore();
+}
+
+function render() {
+  ctx.clearRect(0,0,FIELD_W,FIELD_H);
+  drawMat(ctx);
+  const fPos = formations[activeFormation] || {};
+  members.forEach(m => {
+    const p = animPositions[m.id] || fPos[m.id];
+    if (!p) return;
+    const role = ROLES[m.role];
+    drawShape(ctx, role.shape, p.x, p.y, MEMBER_R, role.color, m.name, selectedMember===m.id);
+  });
+  document.getElementById('canvas-empty').style.display = members.length===0?'flex':'none';
+}
+
+// ─── Canvas interaction ───────────────────────────────────────────────────────
+function canvasPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches ? e.touches[0] : e;
+  return { x:(touch.clientX-rect.left)*(FIELD_W/rect.width), y:(touch.clientY-rect.top)*(FIELD_H/rect.height) };
+}
+function hitTest(pos) {
+  const fPos = formations[activeFormation]||{};
+  for (let i=members.length-1;i>=0;i--) {
+    const m=members[i], p=fPos[m.id];
+    if (!p) continue;
+    if (Math.hypot(p.x-pos.x,p.y-pos.y)<MEMBER_R+4) return m.id;
+  }
+  return null;
+}
+canvas.addEventListener('mousedown', e => {
+  if (playing) return;
+  const pos=canvasPos(e), hit=hitTest(pos);
+  if (hit) {
+    selectedMember=hit;
+    const fp=formations[activeFormation][hit];
+    dragging={id:hit,offsetX:pos.x-fp.x,offsetY:pos.y-fp.y};
+    canvas.style.cursor='grabbing';
+  } else { selectedMember=null; }
+  render(); updateRightPanel();
+});
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const pos=canvasPos(e);
+  const nx=Math.max(MEMBER_R,Math.min(FIELD_W-MEMBER_R,pos.x-dragging.offsetX));
+  const ny=Math.max(MEMBER_R,Math.min(FIELD_H-MEMBER_R,pos.y-dragging.offsetY));
+  formations[activeFormation][dragging.id]={x:nx,y:ny};
+  render(); updateRightPanel();
+});
+canvas.addEventListener('mouseup', () => { dragging=null; canvas.style.cursor='default'; });
+canvas.addEventListener('mouseleave', () => { dragging=null; canvas.style.cursor='default'; });
+
+// ─── Easing ───────────────────────────────────────────────────────────────────
+function easeInOut(t) { return t<0.5?2*t*t:-1+(4-2*t)*t; }
+
+// ─── Play ─────────────────────────────────────────────────────────────────────
+function startPlay() {
+  if (formations.length<2) return;
+  playing=true; let fIdx=0;
+  playState={cancelled:false};
+  document.getElementById('play-btn').style.display='none';
+  document.getElementById('stop-btn').style.display='inline-block';
+  document.getElementById('pdf-btn').disabled=true;
+
+  function animateStep(fromF, toF, onDone) {
+    const t0=performance.now();
+    const fromPos={}, toPos={};
+    members.forEach(m => {
+      fromPos[m.id]=formations[fromF]?.[m.id]||{x:FIELD_W/2,y:FIELD_H/2};
+      toPos[m.id]=formations[toF]?.[m.id]||fromPos[m.id];
+    });
+    function step(now) {
+      if (playState.cancelled) return;
+      const t=Math.min((now-t0)/ANIM_MS,1), e=easeInOut(t);
+      members.forEach(m => {
+        const f=fromPos[m.id], to=toPos[m.id];
+        animPositions[m.id]={x:f.x+(to.x-f.x)*e,y:f.y+(to.y-f.y)*e};
+      });
+      render();
+      if (t<1) { animRef=requestAnimationFrame(step); }
+      else { onDone(); }
+    }
+    animRef=requestAnimationFrame(step);
+  }
+
+  function runNext() {
+    if (playState.cancelled) return;
+    fIdx++;
+    if (fIdx>=formations.length) {
+      animPositions={};
+      activeFormation=formations.length-1;
+      updateFormationTabs(); updateRightPanel();
+      stopPlay(); return;
+    }
+    animPositions={};
+    activeFormation=fIdx-1;
+    updateFormationTabs(); updateRightPanel();
+    render();
+    setTimeout(()=>{
+      if (playState.cancelled) return;
+      animateStep(fIdx-1, fIdx, runNext);
+    }, 400);
+  }
+
+  activeFormation=0; animPositions={}; updateFormationTabs(); updateRightPanel();
+  animateStep(0,1,runNext);
+}
+
+function stopPlay() {
+  if (playState) playState.cancelled=true;
+  if (animRef) cancelAnimationFrame(animRef);
+  playing=false; animPositions={};
+  document.getElementById('play-btn').style.display='inline-block';
+  document.getElementById('stop-btn').style.display='none';
+  document.getElementById('pdf-btn').disabled=members.length===0;
+  render();
+}
+
+// ─── PDF Export ───────────────────────────────────────────────────────────────
+function renderSnapshot(formation, members, label) {
+  const c=document.createElement('canvas'); c.width=FIELD_W; c.height=FIELD_H;
+  const x=c.getContext('2d');
+  drawMat(x);
+  x.fillStyle='rgba(0,0,0,0.18)'; x.font='bold 13px sans-serif';
+  x.textAlign='left'; x.textBaseline='top'; x.fillText(label,10,8);
+  members.forEach(m => {
+    const p=formation[m.id]; if(!p) return;
+    drawShape(x,ROLES[m.role].shape,p.x,p.y,MEMBER_R,ROLES[m.role].color,m.name,false);
+  });
+  return c;
+}
+
+function exportPDF() {
+  if (members.length===0) return;
+
+  const snapshots = formations.map((f,i)=>({
+    dataUrl: renderSnapshot(f,members,formationLabels[i]||`Formation ${i+1}`).toDataURL('image/png'),
+    label: formationLabels[i]||`Formation ${i+1}`,
+    index: i
+  }));
+
+  const legendHtml = Object.entries(ROLES).map(([role,{color,shape}])=>{
+    const bg=color==='#FFFFFF'?'#aaa':color;
+    const sym=shape==='circle'?'&#9679;':shape==='diamond'?'&#9670;':shape==='square'?'&#9632;':'&#9733;';
+    return `<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-size:13px"><span style="color:${bg};font-size:16px">${sym}</span>${role}</span>`;
+  }).join('');
+
+
+
+  const formationsHtml = snapshots.map(({dataUrl,label,index})=>`
+    <div style="margin-bottom:32px;page-break-inside:avoid">
+      <h2 style="color:#00693E;font-size:15px;margin:0 0 8px;font-family:Helvetica,Arial,sans-serif">${label}</h2>
+      <img src="${dataUrl}" style="width:100%;border:2px solid #000;display:block;border-radius:3px"/>
+    </div>`).join('');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Cheer Formations</title>
+<style>
+  @media print{.no-print{display:none!important}}
+  body{font-family:Helvetica,Arial,sans-serif;margin:0;padding:24px;color:#111;background:#fff;max-width:900px}
+  h1{color:#00693E;font-size:22px;margin:0 0 6px}
+  .legend{margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #ddd}
+  .btn{display:inline-block;margin:0 0 24px;padding:10px 24px;background:#00693E;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:bold;cursor:pointer}
+  .btn:hover{background:#005a34}
+</style></head><body>
+<button class="btn no-print" onclick="window.print()">🖨 Print / Save as PDF</button>
+<h1>🎀 Cheer Formation Planner</h1>
+<div class="legend">${legendHtml}</div>
+${formationsHtml}
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='cheer-formations.html'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),5000);
+}
+
+// ─── Members ──────────────────────────────────────────────────────────────────
+function addMember() {
+  const name=document.getElementById('new-name').value.trim();
+  const role=document.getElementById('new-role').value;
+  if (!name) return;
+  const id='m'+Date.now();
+  members.push({id,name,role});
+  formations.forEach(f=>{ f[id]={x:FIELD_W/2+Math.random()*60-30,y:FIELD_H/2+Math.random()*40-20}; });
+  document.getElementById('new-name').value='';
+  document.getElementById('add-member-form').classList.add('hidden');
+  updateAll();
+}
+
+function removeMember(id) {
+  members=members.filter(m=>m.id!==id);
+  formations.forEach(f=>delete f[id]);
+  if (selectedMember===id) selectedMember=null;
+  updateAll();
+}
+
+// ─── Formations ───────────────────────────────────────────────────────────────
+function addFormation() {
+  const last=formations[formations.length-1]||{};
+  formations.push(JSON.parse(JSON.stringify(last)));
+  formationLabels.push(`Formation ${formations.length}`);
+  activeFormation=formations.length-1;
+  updateAll();
+}
+
+function removeFormation(idx) {
+  if (formations.length<=1) return;
+  formations.splice(idx,1);
+  formationLabels.splice(idx,1);
+  if (activeFormation>=formations.length) activeFormation=formations.length-1;
+  updateAll();
+}
+
+function setActiveFormation(idx) {
+  if (playing) return;
+  activeFormation=idx;
+  updateFormationTabs();
+  updateRightPanel();
+  render();
+}
+
+// ─── UI updates ───────────────────────────────────────────────────────────────
+function updateAll() {
+  updateMembersList();
+  updateFormationTabs();
+  updateRightPanel();
+  updateControls();
+  render();
+}
+
+function updateMembersList() {
+  const list=document.getElementById('members-list');
+  document.getElementById('members-empty').style.display=members.length?'none':'block';
+  // Remove old cards
+  list.querySelectorAll('.member-card').forEach(el=>el.remove());
+  members.forEach(m=>{
+    const role=ROLES[m.role], isWhite=role.color==='#FFFFFF';
+    const sym=role.shape==='star'?'★':role.shape==='circle'?'●':role.shape==='diamond'?'◆':'■';
+    const card=document.createElement('div');
+    card.className='member-card'+(selectedMember===m.id?' selected':'');
+    card.innerHTML=`
+      <span class="member-icon" style="color:${isWhite?'#ccc':role.color}">${sym}</span>
+      <div class="member-info">
+        <div class="member-name">${m.name}</div>
+        <div class="member-role">${m.role}</div>
+      </div>
+      <button class="remove-btn" title="Remove">✕</button>`;
+    card.querySelector('.remove-btn').addEventListener('click',e=>{e.stopPropagation();removeMember(m.id);});
+    card.addEventListener('click',()=>{
+      selectedMember=selectedMember===m.id?null:m.id;
+      updateMembersList(); render(); updateRightPanel();
+    });
+    list.appendChild(card);
+  });
+}
+
+function updateFormationTabs() {
+  const tabs=document.getElementById('formation-tabs');
+  tabs.querySelectorAll('.formation-tab-wrap').forEach(el=>el.remove());
+  const addBtn=document.getElementById('add-formation-btn');
+
+  formations.forEach((_,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='formation-tab-wrap';
+
+    const btn=document.createElement('button');
+    btn.className='formation-btn'+(activeFormation===i?' active':'');
+    btn.textContent=formationLabels[i]||`Formation ${i+1}`;
+    btn.addEventListener('click',()=>setActiveFormation(i));
+    btn.addEventListener('dblclick',()=>{
+      if (playing) return;
+      const inp=document.createElement('input');
+      inp.className='label-input';
+      inp.value=formationLabels[i]||`Formation ${i+1}`;
+      wrap.replaceChild(inp,btn);
+      inp.focus(); inp.select();
+      const done=()=>{
+        formationLabels[i]=inp.value||`Formation ${i+1}`;
+        updateFormationTabs(); updateRightPanel();
+      };
+      inp.addEventListener('blur',done);
+      inp.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Escape')inp.blur();});
+    });
+    wrap.appendChild(btn);
+
+    if (formations.length>1&&!playing) {
+      const x=document.createElement('button');
+      x.className='icon-btn'; x.textContent='✕';
+      x.addEventListener('click',()=>removeFormation(i));
+      wrap.appendChild(x);
+    }
+    tabs.insertBefore(wrap,addBtn);
+  });
+  addBtn.style.display=playing?'none':'inline-block';
+}
+
+function updateRightPanel() {
+  document.getElementById('right-title').textContent=formationLabels[activeFormation]||`Formation ${activeFormation+1}`;
+  const list=document.getElementById('summary-list');
+  list.innerHTML='';
+  members.forEach(m=>{
+    const role=ROLES[m.role], isWhite=role.color==='#FFFFFF';
+    const sym=role.shape==='star'?'★':role.shape==='circle'?'●':role.shape==='diamond'?'◆':'■';
+    const p=formations[activeFormation]?.[m.id];
+    const card=document.createElement('div');
+    card.className='summary-card';
+    card.innerHTML=`
+      <span style="color:${isWhite?'#ccc':role.color};font-size:14px">${sym}</span>
+      <div style="flex:1;min-width:0">
+        <div class="summary-name">${m.name}</div>
+        ${p?`<div class="summary-pos">${Math.round(p.x)}, ${Math.round(p.y)}</div>`:`<div class="summary-unplaced">not placed</div>`}
+      </div>`;
+    list.appendChild(card);
+  });
+
+
+}
+
+function updateControls() {
+  const hasMembers=members.length>0;
+  const canPlay=hasMembers&&formations.length>=2;
+  document.getElementById('play-btn').disabled=!canPlay;
+  document.getElementById('pdf-btn').disabled=!hasMembers;
+  document.getElementById('hint').style.display=hasMembers&&!playing?'block':'none';
+  document.getElementById('formations-hint').style.display=hasMembers&&formations.length<2&&!playing?'block':'none';
+}
+
+function updateLegend() {
+  const leg=document.getElementById('legend');
+  leg.innerHTML='';
+  Object.entries(ROLES).forEach(([role,{color,shape,label}])=>{
+    const isWhite=color==='#FFFFFF';
+    const sym=shape==='star'?'★':shape==='circle'?'●':shape==='diamond'?'◆':'■';
+    const tag=document.createElement('span');
+    tag.className='tag';
+    tag.style.background=isWhite?'rgba(255,255,255,0.1)':color+'22';
+    tag.style.border=`1px solid ${isWhite?'#999':color+'55'}`;
+    tag.style.color=isWhite?'#ccc':color;
+    tag.innerHTML=`${sym} ${label}`;
+    leg.appendChild(tag);
+  });
+  // Populate role select
+  const sel=document.getElementById('new-role');
+  sel.innerHTML='';
+  Object.keys(ROLES).forEach(r=>{ const o=document.createElement('option'); o.value=r; o.textContent=r; sel.appendChild(o); });
+}
+
+// ─── Event wiring ─────────────────────────────────────────────────────────────
+document.getElementById('add-member-btn').addEventListener('click',()=>{
+  document.getElementById('add-member-form').classList.toggle('hidden');
+  document.getElementById('new-name').focus();
+});
+document.getElementById('confirm-add-btn').addEventListener('click',addMember);
+document.getElementById('cancel-add-btn').addEventListener('click',()=>document.getElementById('add-member-form').classList.add('hidden'));
+document.getElementById('new-name').addEventListener('keydown',e=>{ if(e.key==='Enter') addMember(); });
+document.getElementById('add-formation-btn').addEventListener('click',addFormation);
+document.getElementById('play-btn').addEventListener('click',startPlay);
+document.getElementById('stop-btn').addEventListener('click',stopPlay);
+document.getElementById('pdf-btn').addEventListener('click',exportPDF);
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+updateLegend();
+updateAll();
+</script>
+</body>
+</html>
