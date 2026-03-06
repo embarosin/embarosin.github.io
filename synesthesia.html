@@ -110,7 +110,104 @@
     transition: opacity 0.5s;
   }
 
-  .canvas-overlay.hidden { opacity: 0; }
+  .canvas-overlay.hidden { opacity: 0; pointer-events: none; }
+
+  /* LOADING OVERLAY */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .loading-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  .loading-spinner {
+    width: 48px;
+    height: 48px;
+    border: 2px solid rgba(255,230,0,0.15);
+    border-top-color: var(--trumpet);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-step {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: center;
+    max-width: 360px;
+    line-height: 1.6;
+  }
+
+  .loading-step .step-label {
+    color: var(--text);
+    display: block;
+    margin-bottom: 0.4rem;
+    font-size: 0.78rem;
+  }
+
+  .loading-progress-track {
+    width: 260px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .loading-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--trumpet);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  .loading-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  .loading-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .loading-steps-list .step-item {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    color: rgba(232,228,217,0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: color 0.3s;
+  }
+
+  .loading-steps-list .step-item.active { color: var(--trumpet); }
+  .loading-steps-list .step-item.done { color: rgba(34,197,94,0.7); }
+
+  .step-icon {
+    width: 14px;
+    text-align: center;
+    flex-shrink: 0;
+  }
 
   .upload-prompt {
     text-align: center;
@@ -453,6 +550,23 @@
         <p>or click a demo below →</p>
       </div>
     </div>
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-spinner" id="loadingSpinner"></div>
+      <div class="loading-step">
+        <span class="step-label" id="loadingLabel">Preparing analysis…</span>
+        <span id="loadingDetail"></span>
+      </div>
+      <div class="loading-progress-track">
+        <div class="loading-progress-fill" id="loadingFill"></div>
+      </div>
+      <div class="loading-pct" id="loadingPct"></div>
+      <div class="loading-steps-list">
+        <div class="step-item" id="step-decode"><span class="step-icon">·</span>Decode audio</div>
+        <div class="step-item" id="step-model"><span class="step-icon">·</span>Load ML model</div>
+        <div class="step-item" id="step-resample"><span class="step-icon">·</span>Resample to 16 kHz</div>
+        <div class="step-item" id="step-classify"><span class="step-icon">·</span>Classify instruments</div>
+      </div>
+    </div>
   </div>
 
   <!-- SIDEBAR -->
@@ -654,12 +768,60 @@ uploadZone.addEventListener('drop', async e => {
   }
 });
 
+// ─── LOADING OVERLAY HELPERS ──────────────────────────────────────────────
+function showLoading() {
+  document.getElementById('canvasOverlay').classList.add('hidden');
+  document.getElementById('loadingOverlay').classList.add('visible');
+  // Reset all steps
+  ['decode','model','resample','classify'].forEach(s => {
+    const el = document.getElementById('step-' + s);
+    el.className = 'step-item';
+    el.querySelector('.step-icon').textContent = '·';
+  });
+  setLoadingProgress(0, '');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+function setLoadingStep(label, detail) {
+  document.getElementById('loadingLabel').textContent = label;
+  document.getElementById('loadingDetail').textContent = detail || '';
+}
+
+function setLoadingProgress(pct, text) {
+  document.getElementById('loadingFill').style.width = pct + '%';
+  document.getElementById('loadingPct').textContent = text || (pct > 0 ? pct + '%' : '');
+}
+
+function markStep(id, state) {
+  const el = document.getElementById('step-' + id);
+  if (!el) return;
+  const icon = el.querySelector('.step-icon');
+  if (state === 'active') {
+    el.className = 'step-item active';
+    icon.textContent = '▸';
+  } else if (state === 'done') {
+    el.className = 'step-item done';
+    icon.textContent = '✓';
+  }
+}
+
 async function loadAudio(file) {
   stopPlayback();
+  showLoading();
+
+  // Step 1: Decode
+  markStep('decode', 'active');
+  setLoadingStep('Decoding audio…', file.name);
+  setLoadingProgress(0, '');
+
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const buffer = await file.arrayBuffer();
   audioBuffer = await audioCtx.decodeAudioData(buffer);
-  document.getElementById('canvasOverlay').classList.add('hidden');
+  markStep('decode', 'done');
+
   blobs = []; particles = []; strokes = []; flowLines = [];
   // Pre-analyse the whole song — enables play button when first chunk is done
   preAnalyseSong(audioBuffer);
@@ -795,7 +957,14 @@ async function initML() {
       {
         progress_callback: (data) => {
           if (data.status === 'progress' && data.progress) {
-            setModelStatus(`Loading model: ${Math.round(data.progress)}%`);
+            const pct = Math.round(data.progress);
+            setModelStatus(`Loading model: ${pct}%`);
+            // Also update loading overlay if it's visible (file uploaded while model loads)
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay.classList.contains('visible')) {
+              setLoadingStep('Downloading ML model…', `${pct}% — first visit only, cached after`);
+              setLoadingProgress(pct, `${pct}%`);
+            }
           }
         }
       }
@@ -848,18 +1017,33 @@ async function classifyChunkML(pcm16k) {
 
 // ─── Pre-analyse the entire song on upload ───────────────────────────────
 async function preAnalyseSong(audioBuf) {
-  // Wait for model if it's still loading
+  // Step 2: Wait for ML model
   if (!mlClassifier) {
+    markStep('model', 'active');
+    setLoadingStep('Waiting for ML model…', 'First visit downloads ~87 MB (cached after)');
+    setLoadingProgress(0, 'downloading…');
     setModelStatus('Waiting for ML model to finish loading…');
     while (!mlClassifier) {
       await new Promise(r => setTimeout(r, 500));
-      if (document.getElementById('modelStatus').textContent.includes('failed')) return;
+      if (document.getElementById('modelStatus').textContent.includes('failed')) {
+        setLoadingStep('Model load failed', 'Check console for details');
+        return;
+      }
     }
   }
+  markStep('model', 'done');
 
+  // Step 3: Resample
+  markStep('resample', 'active');
+  setLoadingStep('Resampling audio…', 'Converting to 16 kHz mono for ML input');
+  setLoadingProgress(0, 'resampling…');
   setModelStatus('Resampling audio to 16 kHz…');
-  const pcm16k = await resampleTo16k(audioBuf);
 
+  const pcm16k = await resampleTo16k(audioBuf);
+  markStep('resample', 'done');
+
+  // Step 4: Classify chunks
+  markStep('classify', 'active');
   const chunkSamples = CHUNK_SEC * 16000;
   const totalChunks = Math.ceil(pcm16k.length / chunkSamples);
 
@@ -868,6 +1052,8 @@ async function preAnalyseSong(audioBuf) {
   inferenceTotal = totalChunks;
   inferenceDone = 0;
 
+  setLoadingStep('Classifying instruments…', `0 / ${totalChunks} chunks`);
+  setLoadingProgress(0, '0%');
   setModelStatus(`Classifying: 0/${totalChunks} chunks…`);
   document.getElementById('playBtn').disabled = true;
 
@@ -898,6 +1084,8 @@ async function preAnalyseSong(audioBuf) {
 
     inferenceDone++;
     const pct = Math.round(inferenceDone / totalChunks * 100);
+    setLoadingStep('Classifying instruments…', `${inferenceDone} / ${totalChunks} chunks`);
+    setLoadingProgress(pct, `${pct}%`);
     setModelStatus(`Classifying: ${inferenceDone}/${totalChunks} (${pct}%)…`);
 
     if (inferenceDone === 1) {
@@ -905,9 +1093,16 @@ async function preAnalyseSong(audioBuf) {
     }
   }
 
+  markStep('classify', 'done');
   inferenceReady = true;
   document.getElementById('playBtn').disabled = false;
   setModelStatus(`ML analysis complete (${totalChunks} chunks)`);
+
+  // Brief pause to show completion, then hide overlay
+  setLoadingStep('Analysis complete', 'Ready to play');
+  setLoadingProgress(100, 'done');
+  await new Promise(r => setTimeout(r, 600));
+  hideLoading();
 }
 
 // Look up the cached inference for the current playback position
