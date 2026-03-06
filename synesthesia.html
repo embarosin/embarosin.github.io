@@ -546,8 +546,11 @@
     <div class="canvas-overlay" id="canvasOverlay">
       <div class="upload-prompt">
         <span class="big-icon">♩</span>
-        <h2>Upload an audio file<br>to begin</h2>
-        <p>or click a demo below →</p>
+        <h2>Try a demo first,<br>or upload your own</h2>
+        <p>Scroll down to a demo on the right to start instantly →</p>
+        <p style="margin-top:0.6rem;font-size:0.65rem;opacity:0.5;max-width:320px;line-height:1.7">
+          For your own files, 30 seconds or less works best —<br>the ML model takes a moment to warm up.
+        </p>
       </div>
     </div>
     <div class="loading-overlay" id="loadingOverlay">
@@ -566,6 +569,7 @@
         <div class="step-item" id="step-resample"><span class="step-icon">·</span>Resample to 16 kHz</div>
         <div class="step-item" id="step-classify"><span class="step-icon">·</span>Classify instruments</div>
       </div>
+      <button class="btn danger" id="cancelLoadBtn" style="margin-top:1rem;width:200px;font-size:0.68rem">✕ Cancel</button>
     </div>
   </div>
 
@@ -581,6 +585,9 @@
         <div class="zone-text">Drop audio file here<br>or click to browse</div>
       </div>
       <div class="file-name" id="fileName"></div>
+      <div style="margin-top:0.75rem;font-size:0.62rem;color:rgba(232,228,217,0.35);line-height:1.65;letter-spacing:0.03em">
+        ⏱ Best with files <strong style="color:rgba(232,228,217,0.55)">30 seconds or less</strong> — the ML model needs a moment to load and analyse each chunk.
+      </div>
       <div class="playback-bar" id="playbackBar">
         <div class="playback-fill" id="playbackFill"></div>
       </div>
@@ -634,11 +641,17 @@
       <div class="instrument-grid" id="instrumentGrid">
         <!-- populated by JS -->
       </div>
+      <p style="margin-top:1rem;font-size:0.6rem;color:rgba(232,228,217,0.3);line-height:1.7;letter-spacing:0.03em">
+        The model gives a close approximation of what's present in the sound, but is not perfect. It currently has the most difficulty distinguishing <span style="color:rgba(244,114,182,0.6)">piano</span> from <span style="color:rgba(249,115,22,0.6)">guitar</span>, which share similar harmonic structure. What you see is still a "close-enough" reflection of the audio's timbral character.
+      </p>
     </div>
 
     <!-- DEMOS -->
     <div class="sidebar-section">
-      <h3>Demo Visualizations</h3>
+      <h3>✦ Demo Visualizations — Start Here</h3>
+      <p style="font-size:0.62rem;color:rgba(232,228,217,0.4);line-height:1.65;letter-spacing:0.03em;margin-bottom:1rem">
+        No upload needed. These run instantly and show the full range of visual styles.
+      </p>
       <div class="demo-grid">
         <div class="demo-item" onclick="runDemo('brass')">
           <div class="demo-dots">
@@ -810,6 +823,7 @@ function markStep(id, state) {
 
 async function loadAudio(file) {
   stopPlayback();
+  loadCancelled = false;
   showLoading();
 
   // Step 1: Decode
@@ -823,8 +837,8 @@ async function loadAudio(file) {
   markStep('decode', 'done');
 
   blobs = []; particles = []; strokes = []; flowLines = [];
-  // Pre-analyse the whole song — enables play button when first chunk is done
-  preAnalyseSong(audioBuffer);
+  // Await the full analysis pipeline — keeps the loading overlay alive until done
+  await preAnalyseSong(audioBuffer);
 }
 
 // ─── PLAYBACK ─────────────────────────────────────────────────────────────
@@ -910,15 +924,58 @@ function updateStatusDot() {
 }
 
 // ─── ML-BASED INSTRUMENT CLASSIFICATION (AST via Transformers.js) ────────
-// On file load: resample to 16kHz, chunk the audio, classify each chunk
-// with the Audio Spectrogram Transformer pretrained on AudioSet (527 classes).
-// During playback we look up the cached ML results — zero waiting.
+// Classification strategy:
+//   • Classify at CLASSIFY_SEC (5s) chunks — gives AST enough temporal context
+//     to distinguish timbres reliably (it was trained on 10s clips).
+//   • Build a PLAYBACK_SEC (1s) interpolated lookup table so visualisation
+//     still animates smoothly frame-by-frame.
+//   • Apply a rivalry suppression pass: instruments that are acoustically
+//     ambiguous penalise each other proportionally, so e.g. strong guitar
+//     confidence pulls piano down.
 
-const CHUNK_SEC = 4;
-let songInferences = [];
-let inferenceReady = false;
-let inferenceTotal = 0;
-let inferenceDone = 0;
+const CLASSIFY_SEC  = 5;   // context window fed to AST
+const PLAYBACK_SEC  = 1;   // resolution of the playback lookup table (for smooth animation)
+let songInferences  = [];  // length = ceil(duration / PLAYBACK_SEC), interp'd
+let inferenceReady  = false;
+let inferenceTotal  = 0;
+let inferenceDone   = 0;
+let loadCancelled   = false;
+
+document.getElementById('cancelLoadBtn').addEventListener('click', () => {
+  loadCancelled = true;
+  hideLoading();
+  document.getElementById('canvasOverlay').classList.remove('hidden');
+  setModelStatus('Analysis cancelled');
+});
+
+// ─── Rivalry suppression matrix ───────────────────────────────────────────
+// Each entry: if key instrument is confident, suppress its rivals by factor.
+// Applied as: rival_score *= (1 - factor * key_confidence)
+// so a guitar at 0.9 confidence suppresses piano by 0.75 * 0.9 = 67.5%.
+const RIVALRIES = {
+  guitar:    { piano: 0.75, saxophone: 0.35, voice_hi: 0.25 },
+  piano:     { guitar: 0.55, voice_hi: 0.20 },
+  violin:    { guitar: 0.40, voice_hi: 0.30 },
+  saxophone: { guitar: 0.35, trumpet: 0.25, flute: 0.30 },
+  trumpet:   { saxophone: 0.30, flute: 0.20 },
+  flute:     { violin: 0.30, voice_hi: 0.35 },
+  voice_hi:  { flute: 0.30, violin: 0.20 },
+  bass:      { guitar: 0.20 },
+};
+
+function applyRivalrySuppression(scores) {
+  const out = { ...scores };
+  for (const [dominant, rivals] of Object.entries(RIVALRIES)) {
+    const domScore = scores[dominant] || 0;
+    if (domScore < 0.05) continue; // not confident enough to suppress anything
+    for (const [rivalId, factor] of Object.entries(rivals)) {
+      if (out[rivalId] !== undefined) {
+        out[rivalId] = out[rivalId] * (1 - factor * domScore);
+      }
+    }
+  }
+  return out;
+}
 
 function setModelStatus(msg) {
   const el = document.getElementById('modelStatus');
@@ -979,17 +1036,58 @@ async function initML() {
 // Start loading immediately in the background
 initML();
 
-// ─── Audio resampling to 16 kHz mono ─────────────────────────────────────
-async function resampleTo16k(audioBuf) {
+// ─── Audio resampling to 16 kHz mono (non-blocking, chunked) ─────────────
+// WHY 16 kHz?
+// The Audio Spectrogram Transformer (AST) was pretrained on AudioSet using
+// log-mel spectrograms computed at 16 kHz. This is the standard for virtually
+// all modern audio ML models (Whisper, wav2vec2, HuBERT, etc.) because:
+//   1. Nyquist limit: 8 kHz captures all phonemic content in speech and the
+//      fundamental + first several harmonics of every orchestral instrument.
+//      (Violin peaks around 3–4 kHz; very few instrument timbres require >8 kHz
+//       for classification — those upper harmonics contribute brightness but the
+//       model's mel filterbank compresses them anyway.)
+//   2. Compute: 16 kHz is 1/2.75× the data of 44.1 kHz, so each forward pass
+//      processes far fewer tokens — critical when classifying dozens of chunks.
+//   3. Calibration: The model's learned mel filterbank weights are anchored to
+//      16 kHz bin boundaries. Feeding 44.1 kHz audio would misalign every
+//      frequency bin — the model would "see" the wrong pitches entirely.
+// Bottom line: down-sampling to 16 kHz is not lossy for instrument ID;
+// it's exactly the representation the model was trained on.
+async function resampleTo16k(audioBuf, onProgress) {
   const targetRate = 16000;
-  const numSamples = Math.ceil(audioBuf.duration * targetRate);
-  const offCtx = new OfflineAudioContext(1, numSamples, targetRate);
-  const src = offCtx.createBufferSource();
-  src.buffer = audioBuf;
-  src.connect(offCtx.destination);
-  src.start(0);
-  const rendered = await offCtx.startRendering();
-  return rendered.getChannelData(0);
+  // Split into segments to avoid blocking the main thread for large files.
+  // Each OfflineAudioContext renders ~10s of audio then yields control.
+  const SEGMENT_SEC = 10;
+  const segmentSamples = Math.ceil(SEGMENT_SEC * targetRate);
+  const totalOutputSamples = Math.ceil(audioBuf.duration * targetRate);
+  const output = new Float32Array(totalOutputSamples);
+  const totalSegments = Math.ceil(audioBuf.duration / SEGMENT_SEC);
+
+  for (let seg = 0; seg < totalSegments; seg++) {
+    if (loadCancelled) return null;
+
+    const startSec = seg * SEGMENT_SEC;
+    const endSec = Math.min(startSec + SEGMENT_SEC, audioBuf.duration);
+    const durationSec = endSec - startSec;
+    const outSamples = Math.ceil(durationSec * targetRate);
+
+    const offCtx = new OfflineAudioContext(1, outSamples, targetRate);
+    const src = offCtx.createBufferSource();
+    src.buffer = audioBuf;
+    src.connect(offCtx.destination);
+    src.start(0, startSec, durationSec);
+    const rendered = await offCtx.startRendering();
+    const chunk = rendered.getChannelData(0);
+
+    const writeStart = seg * segmentSamples;
+    output.set(chunk, writeStart);
+
+    if (onProgress) onProgress((seg + 1) / totalSegments);
+    // Yield to browser event loop between segments
+    await new Promise(r => setTimeout(r, 0));
+  }
+
+  return output;
 }
 
 // ─── Classify a single PCM chunk (16 kHz Float32Array) ───────────────────
@@ -1012,11 +1110,14 @@ async function classifyChunkML(pcm16k) {
     }
   }
 
-  return scores;
+  // Apply rivalry suppression to reduce cross-instrument confusion
+  return applyRivalrySuppression(scores);
 }
 
 // ─── Pre-analyse the entire song on upload ───────────────────────────────
 async function preAnalyseSong(audioBuf) {
+  loadCancelled = false;
+
   // Step 2: Wait for ML model
   if (!mlClassifier) {
     markStep('model', 'active');
@@ -1025,6 +1126,7 @@ async function preAnalyseSong(audioBuf) {
     setModelStatus('Waiting for ML model to finish loading…');
     while (!mlClassifier) {
       await new Promise(r => setTimeout(r, 500));
+      if (loadCancelled) return;
       if (document.getElementById('modelStatus').textContent.includes('failed')) {
         setLoadingStep('Model load failed', 'Check console for details');
         return;
@@ -1033,36 +1135,47 @@ async function preAnalyseSong(audioBuf) {
   }
   markStep('model', 'done');
 
-  // Step 3: Resample
+  // Step 3: Resample — chunked so the browser stays responsive
   markStep('resample', 'active');
   setLoadingStep('Resampling audio…', 'Converting to 16 kHz mono for ML input');
   setLoadingProgress(0, 'resampling…');
   setModelStatus('Resampling audio to 16 kHz…');
 
-  const pcm16k = await resampleTo16k(audioBuf);
+  const pcm16k = await resampleTo16k(audioBuf, (frac) => {
+    const pct = Math.round(frac * 100);
+    setLoadingProgress(pct, `${pct}%`);
+    setLoadingStep('Resampling audio…', `${pct}% complete`);
+  });
+
+  if (loadCancelled || !pcm16k) return;
   markStep('resample', 'done');
 
-  // Step 4: Classify chunks
+  // Step 4: Classify at CLASSIFY_SEC (5s) chunks for better AST accuracy.
+  // AST was trained on 10s clips — 5s gives it enough harmonic + rhythmic
+  // context to reliably separate guitar from piano, etc.
   markStep('classify', 'active');
-  const chunkSamples = CHUNK_SEC * 16000;
-  const totalChunks = Math.ceil(pcm16k.length / chunkSamples);
+  const classifySamples = CLASSIFY_SEC * 16000;
+  const totalClassifyChunks = Math.ceil(pcm16k.length / classifySamples);
 
-  songInferences = new Array(totalChunks).fill(null);
+  // Raw classification results at 5s resolution
+  const rawInferences = new Array(totalClassifyChunks).fill(null);
   inferenceReady = false;
-  inferenceTotal = totalChunks;
+  inferenceTotal = totalClassifyChunks;
   inferenceDone = 0;
 
-  setLoadingStep('Classifying instruments…', `0 / ${totalChunks} chunks`);
+  setLoadingStep('Classifying instruments…', `0 / ${totalClassifyChunks} chunks`);
   setLoadingProgress(0, '0%');
-  setModelStatus(`Classifying: 0/${totalChunks} chunks…`);
+  setModelStatus(`Classifying: 0/${totalClassifyChunks} chunks…`);
   document.getElementById('playBtn').disabled = true;
 
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * chunkSamples;
-    const end = Math.min(start + chunkSamples, pcm16k.length);
+  for (let i = 0; i < totalClassifyChunks; i++) {
+    if (loadCancelled) return;
+
+    const start = i * classifySamples;
+    const end   = Math.min(start + classifySamples, pcm16k.length);
     const chunk = pcm16k.slice(start, end);
 
-    // Check if chunk is silent
+    // Skip silent chunks
     let rms = 0;
     for (let j = 0; j < chunk.length; j++) rms += chunk[j] * chunk[j];
     rms = Math.sqrt(rms / chunk.length);
@@ -1070,45 +1183,92 @@ async function preAnalyseSong(audioBuf) {
     if (rms < 0.001) {
       const silent = {};
       INSTRUMENTS.forEach(inst => silent[inst.id] = 0);
-      songInferences[i] = silent;
+      rawInferences[i] = silent;
     } else {
       try {
-        songInferences[i] = await classifyChunkML(chunk);
+        rawInferences[i] = await classifyChunkML(chunk);
       } catch (e) {
         console.warn(`Chunk ${i} classification failed:`, e);
         const fallback = {};
         INSTRUMENTS.forEach(inst => fallback[inst.id] = 0);
-        songInferences[i] = fallback;
+        rawInferences[i] = fallback;
       }
     }
 
     inferenceDone++;
-    const pct = Math.round(inferenceDone / totalChunks * 100);
-    setLoadingStep('Classifying instruments…', `${inferenceDone} / ${totalChunks} chunks`);
+    const pct = Math.round(inferenceDone / totalClassifyChunks * 100);
+    setLoadingStep('Classifying instruments…', `${inferenceDone} / ${totalClassifyChunks} chunks`);
     setLoadingProgress(pct, `${pct}%`);
-    setModelStatus(`Classifying: ${inferenceDone}/${totalChunks} (${pct}%)…`);
+    setModelStatus(`Classifying: ${inferenceDone}/${totalClassifyChunks} (${pct}%)…`);
 
+    // Allow play after first 5s chunk is done
     if (inferenceDone === 1) {
+      // Pre-populate the playback table with what we have so far
+      buildPlaybackTable(rawInferences, audioBuf.duration);
       document.getElementById('playBtn').disabled = false;
     }
+
+    // Yield to browser between every chunk to keep the UI alive
+    await new Promise(r => setTimeout(r, 0));
   }
+
+  if (loadCancelled) return;
+
+  // Build the final full-resolution 1s playback lookup table
+  buildPlaybackTable(rawInferences, audioBuf.duration);
 
   markStep('classify', 'done');
   inferenceReady = true;
   document.getElementById('playBtn').disabled = false;
-  setModelStatus(`ML analysis complete (${totalChunks} chunks)`);
+  setModelStatus(`ML analysis complete — ${totalClassifyChunks} chunks × ${CLASSIFY_SEC}s`);
 
-  // Brief pause to show completion, then hide overlay
   setLoadingStep('Analysis complete', 'Ready to play');
   setLoadingProgress(100, 'done');
   await new Promise(r => setTimeout(r, 600));
   hideLoading();
 }
 
-// Look up the cached inference for the current playback position
+// ─── Build 1s interpolated playback table from 5s raw inferences ─────────
+// Each 1s slot gets a weighted blend of the surrounding 5s classifications,
+// using linear interpolation so instrument confidence transitions smoothly
+// rather than jumping every 5 seconds.
+function buildPlaybackTable(rawInferences, durationSec) {
+  const totalSlots = Math.ceil(durationSec / PLAYBACK_SEC);
+  songInferences = new Array(totalSlots);
+
+  for (let slot = 0; slot < totalSlots; slot++) {
+    const tSec = slot * PLAYBACK_SEC + PLAYBACK_SEC / 2; // centre of slot
+
+    // Which two raw 5s chunks bracket this moment?
+    const rawPos   = tSec / CLASSIFY_SEC;
+    const rawLow   = Math.floor(rawPos);
+    const rawHigh  = Math.min(rawLow + 1, rawInferences.length - 1);
+    const blend    = rawPos - rawLow; // 0..1
+
+    const a = rawInferences[rawLow];
+    const b = rawInferences[rawHigh];
+
+    if (!a && !b) {
+      const empty = {};
+      INSTRUMENTS.forEach(inst => empty[inst.id] = 0);
+      songInferences[slot] = empty;
+      continue;
+    }
+
+    const interp = {};
+    INSTRUMENTS.forEach(inst => {
+      const va = (a && a[inst.id]) || 0;
+      const vb = (b && b[inst.id]) || 0;
+      interp[inst.id] = va + (vb - va) * blend;
+    });
+    songInferences[slot] = interp;
+  }
+}
+
+// Look up the interpolated 1s inference for the current playback position
 function getCachedInference(elapsedSec) {
   if (!songInferences.length) return null;
-  const idx = Math.floor(elapsedSec / CHUNK_SEC);
+  const idx = Math.min(Math.floor(elapsedSec / PLAYBACK_SEC), songInferences.length - 1);
   return songInferences[idx] || null;
 }
 
@@ -1560,6 +1720,10 @@ const DEMOS = {
 };
 
 function runDemo(type) {
+  runSimulatedDemo(type);
+}
+
+function runSimulatedDemo(type) {
   stopPlayback();
   clearInterval(demoInterval);
   demoMode = true;
