@@ -1695,114 +1695,65 @@ function setStyle(btn) {
 const DEMOS = {
   brass: {
     label: 'Brass Ensemble',
-    instruments: ['trumpet', 'saxophone', 'guitar'],
-    style: 'blobs',
-    pattern: 'swelling'
+    file: 'Brass_Ensemble.wav',
+    style: 'blobs'
   },
   strings: {
     label: 'String Quartet',
-    instruments: ['violin', 'viola', 'bass', 'flute'],
-    style: 'flows',
-    pattern: 'flowing'
+    file: 'String_Quartet.wav',
+    style: 'flows'
   },
   jazz: {
     label: 'Jazz Trio',
-    instruments: ['saxophone', 'voice_hi', 'trumpet', 'piano'],
-    style: 'strokes',
-    pattern: 'rhythmic'
+    file: 'Jazz_Trio.wav',
+    style: 'strokes'
   },
   orchestra: {
     label: 'Full Orchestra',
-    instruments: ['trumpet', 'violin', 'viola', 'voice_hi', 'bass', 'flute', 'saxophone', 'piano'],
-    style: 'layered',
-    pattern: 'complex'
+    file: 'Full_Orchestra.wav',
+    style: 'layered'
   }
 };
 
-function runDemo(type) {
-  runSimulatedDemo(type);
-}
+async function runDemo(type) {
+  const demo = DEMOS[type];
+  const fileName = demo.file;
 
-function runSimulatedDemo(type) {
   stopPlayback();
   clearInterval(demoInterval);
-  demoMode = true;
-  document.getElementById('canvasOverlay').classList.add('hidden');
+  demoMode = false;
 
-  const demo = DEMOS[type];
-  vizStyle = demo.style;
-  document.querySelectorAll('.style-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.style === demo.style);
-  });
+  document.getElementById('fileName').textContent = fileName;
+  showLoading();
+  markStep('decode', 'active');
+  setLoadingStep('Fetching demo audio…', fileName);
+  setLoadingProgress(0, '');
 
-  blobs = []; particles = []; strokes = []; flowLines = [];
-  clearCanvas();
+  try {
+    const response = await fetch('demos/' + fileName);
+    if (!response.ok) throw new Error(`Failed to fetch ${fileName}: ${response.status}`);
+    const arrayBuffer = await response.arrayBuffer();
 
-  let t = 0;
-  const w = visCanvas.offsetWidth;
-  const h = visCanvas.offsetHeight;
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    markStep('decode', 'done');
 
-  // Simulate instrument detection
-  const fakeInstData = {};
-  INSTRUMENTS.forEach(i => fakeInstData[i.id] = 0);
-
-  demoInterval = setInterval(() => {
-    t += 0.05;
-
-    // Fade canvas
-    visCtx.fillStyle = `rgba(10,10,15,0.1)`;
-    visCtx.fillRect(0, 0, w, h);
-
-    // Animate instrument energies
-    demo.instruments.forEach((instId, idx) => {
-      const phase = (idx / demo.instruments.length) * Math.PI * 2;
-      let energy;
-      if (demo.pattern === 'swelling') {
-        energy = 0.3 + 0.5 * Math.abs(Math.sin(t * 0.7 + phase));
-      } else if (demo.pattern === 'flowing') {
-        energy = 0.2 + 0.4 * (0.5 + 0.5 * Math.sin(t * 0.5 + phase));
-      } else if (demo.pattern === 'rhythmic') {
-        energy = Math.random() > 0.6 ? 0.4 + Math.random() * 0.5 : 0.05;
-      } else {
-        energy = 0.1 + 0.6 * Math.abs(Math.sin(t * (0.3 + idx*0.1) + phase));
-      }
-      fakeInstData[instId] = energy;
+    // Set the demo's preferred viz style
+    vizStyle = demo.style;
+    document.querySelectorAll('.style-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.style === demo.style);
     });
 
-    const rms = 0.1 + 0.3 * Math.abs(Math.sin(t));
-    const pitch = { freq: 200 + 800 * Math.abs(Math.sin(t * 0.3)) };
+    blobs = []; particles = []; strokes = []; flowLines = [];
 
-    // Update UI
-    INSTRUMENTS.forEach(inst => {
-      const conf = fakeInstData[inst.id] || 0;
-      const el = document.getElementById('inst-' + inst.id);
-      const fill = document.getElementById('conf-' + inst.id);
-      const pct = document.getElementById('pct-' + inst.id);
-      if (el) {
-        el.classList.toggle('active', conf > 0.15);
-        if (fill) fill.style.width = (conf * 100) + '%';
-        if (pct) pct.textContent = Math.round(conf * 100) + '%';
-      }
-    });
-
-    spawnForInstruments(fakeInstData, rms, pitch, 800, w, h);
-    drawVisualization(w, h);
-
-  }, 40);
-
-  // Show stop button
-  document.getElementById('stopBtn').disabled = false;
-  document.getElementById('stopBtn').onclick = () => {
-    clearInterval(demoInterval);
-    demoMode = false;
-    clearInstruments();
-    clearCanvas();
-    document.getElementById('stopBtn').disabled = true;
-    document.getElementById('stopBtn').onclick = stopPlayback;
-    if (!audioBuffer) document.getElementById('canvasOverlay').classList.remove('hidden');
-  };
-
-  updateStatusDot();
+    // Run the full ML analysis pipeline (same as file upload)
+    await preAnalyseSong(audioBuffer);
+  } catch (err) {
+    console.error('Demo load failed:', err);
+    hideLoading();
+    setModelStatus('Demo load failed — ' + err.message);
+    document.getElementById('canvasOverlay').classList.remove('hidden');
+  }
 }
 
 // Expose to global scope for inline onclick handlers
