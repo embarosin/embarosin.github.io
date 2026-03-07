@@ -622,30 +622,6 @@
       <canvas id="waveCanvas" style="margin-top:1rem"></canvas>
     </div>
 
-    <!-- VIZ STYLE -->
-    <div class="sidebar-section">
-      <h3>Visualization Style</h3>
-      <div class="style-grid">
-        <button class="style-btn active" data-style="blobs" onclick="setStyle(this)">Blobs</button>
-        <button class="style-btn" data-style="flows" onclick="setStyle(this)">Flows</button>
-        <button class="style-btn" data-style="particles" onclick="setStyle(this)">Particles</button>
-        <button class="style-btn" data-style="radial" onclick="setStyle(this)">Radial</button>
-        <button class="style-btn" data-style="strokes" onclick="setStyle(this)">Strokes</button>
-        <button class="style-btn" data-style="layered" onclick="setStyle(this)">Layered</button>
-      </div>
-    </div>
-
-    <!-- INSTRUMENTS -->
-    <div class="sidebar-section">
-      <h3>Detected Instruments</h3>
-      <div class="instrument-grid" id="instrumentGrid">
-        <!-- populated by JS -->
-      </div>
-      <p style="margin-top:1rem;font-size:0.6rem;color:rgba(232,228,217,0.3);line-height:1.7;letter-spacing:0.03em">
-        The model gives a close approximation of what's present in the sound, but is not perfect. It currently has the most difficulty distinguishing <span style="color:rgba(244,114,182,0.6)">piano</span> from <span style="color:rgba(249,115,22,0.6)">guitar</span>, which share similar harmonic structure. What you see is still a "close-enough" reflection of the audio's timbral character.
-      </p>
-    </div>
-
     <!-- DEMOS -->
     <div class="sidebar-section">
       <h3>✦ Demo Visualizations — Start Here</h3>
@@ -687,6 +663,30 @@
           <span class="demo-label">Full Orchestra</span>
         </div>
       </div>
+    </div>
+
+    <!-- VIZ STYLE -->
+    <div class="sidebar-section">
+      <h3>Visualization Style</h3>
+      <div class="style-grid">
+        <button class="style-btn active" data-style="blobs" onclick="setStyle(this)">Blobs</button>
+        <button class="style-btn" data-style="flows" onclick="setStyle(this)">Flows</button>
+        <button class="style-btn" data-style="particles" onclick="setStyle(this)">Particles</button>
+        <button class="style-btn" data-style="radial" onclick="setStyle(this)">Radial</button>
+        <button class="style-btn" data-style="strokes" onclick="setStyle(this)">Strokes</button>
+        <button class="style-btn" data-style="layered" onclick="setStyle(this)">Layered</button>
+      </div>
+    </div>
+
+    <!-- INSTRUMENTS -->
+    <div class="sidebar-section">
+      <h3>Detected Instruments</h3>
+      <div class="instrument-grid" id="instrumentGrid">
+        <!-- populated by JS -->
+      </div>
+      <p style="margin-top:1rem;font-size:0.6rem;color:rgba(232,228,217,0.3);line-height:1.7;letter-spacing:0.03em">
+        The model gives a close approximation of what's present in the sound, but is not perfect. It currently has the most difficulty distinguishing <span style="color:rgba(244,114,182,0.6)">piano</span> from <span style="color:rgba(249,115,22,0.6)">guitar</span>, which share similar harmonic structure. What you see is still a "close-enough" reflection of the audio's timbral character.
+      </p>
     </div>
 
   </div>
